@@ -24,7 +24,9 @@ import (
 //		LEGO_CERTHUB_CLIENT_CERT_APIKEY			- API Key of certificate in LeGo server
 
 // Optional:
-//		LEGO_CERTHUB_CLIENT_LOGLEVEL				- zap log level for the app (default: info)
+//		LEGO_CERTHUB_CLIENT_LOGLEVEL				- zap log level for the app
+//		LEGO_CERTHUB_CLIENT_BIND_ADDRESS		- address to bind the https server to
+//		LEGO_CERTHUB_CLIENT_BIND_PORT				- https server port
 
 // 		LEGO_CERTHUB_CLIENT_CERT_PATH				- the path to save all keys and certificates to
 //    LEGO_CERTHUB_CLIENT_KEY_PERM				- permissions for files containing the key
@@ -41,7 +43,9 @@ import (
 
 // defaults for Optional vars
 const (
-	defaultLogLevel = zapcore.InfoLevel
+	defaultLogLevel    = zapcore.InfoLevel
+	defaultBindAddress = ""
+	defaultBindPort    = 5055
 
 	defaultCertStoragePath = "/opt/legoclient/certs"
 	defaultKeyPermissions  = fs.FileMode(0640)
@@ -75,6 +79,8 @@ type app struct {
 // config holds all of the lego client configuration
 type config struct {
 	LogLevel          zapcore.Level
+	BindAddress       string
+	BindPort          int
 	ServerAddress     string
 	KeyName           string
 	KeyApiKey         string
@@ -150,6 +156,21 @@ func configureApp() (*app, error) {
 	}
 
 	// optional
+	// LEGO_CERTHUB_CLIENT_BIND_ADDRESS
+	app.cfg.BindAddress = os.Getenv("LEGO_CERTHUB_CLIENT_BIND_ADDRESS")
+	if app.cfg.BindAddress == "" {
+		app.logger.Debugf("LEGO_CERTHUB_CLIENT_BIND_ADDRESS not specified, using default \"%s\"", defaultBindAddress)
+		app.cfg.BindAddress = defaultBindAddress
+	}
+
+	// LEGO_CERTHUB_CLIENT_BIND_PORT
+	var err error
+	bindPort := os.Getenv("LEGO_CERTHUB_CLIENT_BIND_PORT")
+	app.cfg.BindPort, err = strconv.Atoi(bindPort)
+	if bindPort == "" || err != nil || app.cfg.BindPort < 1 || app.cfg.BindPort > 65535 {
+		app.logger.Debugf("LEGO_CERTHUB_CLIENT_BIND_PORT not specified or invalid, using default \"%d\"", defaultBindPort)
+		app.cfg.BindPort = defaultBindPort
+	}
 
 	// LEGO_CERTHUB_CLIENT_CERT_PATH
 	app.cfg.CertStoragePath = os.Getenv("LEGO_CERTHUB_CLIENT_CERT_PATH")

@@ -15,10 +15,11 @@ const httpServerReadTimeout = 5 * time.Second
 const httpServerWriteTimeout = 10 * time.Second
 const httpServerIdleTimeout = 1 * time.Minute
 
+// startHttpsServer starts the lego-certhub-client https server
 func (app *app) startHttpsServer() error {
 	// http server config
 	srv := &http.Server{
-		Addr:         ":5055",
+		Addr:         fmt.Sprintf("%s:%d", app.cfg.BindAddress, app.cfg.BindPort),
 		Handler:      nil,
 		IdleTimeout:  httpServerIdleTimeout,
 		ReadTimeout:  httpServerReadTimeout,
