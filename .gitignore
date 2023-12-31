@@ -1,0 +1,8 @@
+# vscode files
+/.vscode
+
+# internal testing
+# env script
+/run-test.ps1
+# out dir
+/out
