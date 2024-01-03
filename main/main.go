@@ -42,16 +42,9 @@ func main() {
 		// os.Exit(1)
 	}
 
-	err = app.saveFiles(keyPem, certPem)
+	err = app.processPem(keyPem, certPem)
 	if err != nil {
-		app.logger.Fatalf("failed to save initial key and/or cert file(s) (%s)", err)
-		// os.Exit(1)
-	}
-
-	// update app's key/cert
-	err = app.tlsCert.Update(keyPem, certPem)
-	if err != nil {
-		app.logger.Fatalf("failed to set initial key and/or cert in lego client tls cert (%s)", err)
+		app.logger.Fatalf("failed to process initial key and/or cert file(s) (%s)", err)
 		// os.Exit(1)
 	}
 

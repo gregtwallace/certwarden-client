@@ -20,7 +20,7 @@ func (app *app) startHttpsServer() error {
 	// http server config
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", app.cfg.BindAddress, app.cfg.BindPort),
-		Handler:      nil,
+		Handler:      http.HandlerFunc(app.postKeyAndCert),
 		IdleTimeout:  httpServerIdleTimeout,
 		ReadTimeout:  httpServerReadTimeout,
 		WriteTimeout: httpServerWriteTimeout,

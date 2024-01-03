@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha1"
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/signal"
@@ -74,6 +76,7 @@ type app struct {
 
 	httpClient *httpClient
 	tlsCert    *SafeCert
+	apiKey     string
 }
 
 // config holds all of the lego client configuration
@@ -254,6 +257,15 @@ func configureApp() (*app, error) {
 			app.cfg.PfxLegacyPassword = defaultPFXLegacyPassword
 		}
 	}
+
+	// calculate and set apiKey - apikey is calculated as SHA1(key api key.cert api key)
+	hasher := sha1.New()
+	_, err = hasher.Write([]byte(app.cfg.KeyApiKey + "." + app.cfg.CertApiKey))
+	if err != nil {
+		return app, fmt.Errorf("failed to generate api key")
+	}
+	app.apiKey = fmt.Sprintf("%x", hasher.Sum(nil))
+	app.logger.Debugf("client apiKey is: %s", app.apiKey)
 
 	// graceful shutdown stuff
 	shutdownContext, doShutdown := context.WithCancel(context.Background())
