@@ -2,7 +2,8 @@ package main
 
 import (
 	"context"
-	"crypto/sha1"
+	"crypto/aes"
+	"crypto/cipher"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -19,6 +20,7 @@ import (
 
 // Environment Variables (to configure client):
 // Mandatory:
+//    LEGO_CERTHUB_CLIENT_SECRET_KEY			- secret key used for communication between LeGo server and client; recommend using the server to generate one (MUST be 32 bytes)
 //		LEGO_CERTHUB_CLIENT_SERVER_ADDRESS	-	DNS name of the LeGo server. Must start with https and have a valid ssl certificate.
 //		LEGO_CERTHUB_CLIENT_KEY_NAME				-	Name of private key in LeGo server
 //		LEGO_CERTHUB_CLIENT_KEY_APIKEY			- API Key of private key in LeGo server
@@ -76,12 +78,11 @@ type app struct {
 
 	httpClient *httpClient
 	tlsCert    *SafeCert
-	apiKey     string
+	cipherAEAD cipher.AEAD
 }
 
 // config holds all of the lego client configuration
 type config struct {
-	LogLevel          zapcore.Level
 	BindAddress       string
 	BindPort          int
 	ServerAddress     string
@@ -113,13 +114,13 @@ func configureApp() (*app, error) {
 	logger.Infof("starting LeGo CertHub Client v%s", appVersion)
 	// deferred log message for if log level was not specified
 	if logLevelErr != nil {
-		logger.Infof("LEGO_CERTHUB_CLIENT_SERVER_ADDRESS not specified or invalid, using default \"%s\"", defaultLogLevel)
+		logger.Infof("LEGO_CERTHUB_CLIENT_LOGLEVEL not specified or invalid, using default \"%s\"", defaultLogLevel)
 	}
 
 	// make app
 	app := &app{
 		logger:     logger,
-		cfg:        &config{LogLevel: logLevel},
+		cfg:        &config{},
 		httpClient: newHttpClient(),
 		tlsCert:    NewSafeCert(nil),
 	}
@@ -127,6 +128,20 @@ func configureApp() (*app, error) {
 	// make rest of config
 
 	// mandatory
+
+	// LEGO_CERTHUB_CLIENT_SECRET_KEY
+	secret := os.Getenv("LEGO_CERTHUB_CLIENT_SECRET_KEY")
+	if len(secret) != 32 {
+		return app, errors.New("LEGO_CERTHUB_CLIENT_SECRET_KEY is required and must be 32 bytes long")
+	}
+	aes, err := aes.NewCipher([]byte(secret))
+	if err != nil {
+		return app, fmt.Errorf("failed to make aes cipher from secret key (%s)", err)
+	}
+	app.cipherAEAD, err = cipher.NewGCM(aes)
+	if err != nil {
+		return app, fmt.Errorf("failed to make gcm aead aes cipher (%s)", err)
+	}
 
 	// LEGO_CERTHUB_CLIENT_SERVER_ADDRESS
 	app.cfg.ServerAddress = os.Getenv("LEGO_CERTHUB_CLIENT_SERVER_ADDRESS")
@@ -167,7 +182,6 @@ func configureApp() (*app, error) {
 	}
 
 	// LEGO_CERTHUB_CLIENT_BIND_PORT
-	var err error
 	bindPort := os.Getenv("LEGO_CERTHUB_CLIENT_BIND_PORT")
 	app.cfg.BindPort, err = strconv.Atoi(bindPort)
 	if bindPort == "" || err != nil || app.cfg.BindPort < 1 || app.cfg.BindPort > 65535 {
@@ -257,15 +271,6 @@ func configureApp() (*app, error) {
 			app.cfg.PfxLegacyPassword = defaultPFXLegacyPassword
 		}
 	}
-
-	// calculate and set apiKey - apikey is calculated as SHA1(key api key.cert api key)
-	hasher := sha1.New()
-	_, err = hasher.Write([]byte(app.cfg.KeyApiKey + "." + app.cfg.CertApiKey))
-	if err != nil {
-		return app, fmt.Errorf("failed to generate api key")
-	}
-	app.apiKey = fmt.Sprintf("%x", hasher.Sum(nil))
-	app.logger.Debugf("client apiKey is: %s", app.apiKey)
 
 	// graceful shutdown stuff
 	shutdownContext, doShutdown := context.WithCancel(context.Background())

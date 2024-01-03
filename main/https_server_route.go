@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
+	"io"
 	"net/http"
 )
 
@@ -26,20 +28,39 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	// resp vary header
 	w.Header().Add("Vary", authHeader)
 
-	// confirm authorization else 401
-	if app.apiKey != r.Header.Get(authHeader) {
+	// read, decode, and try to decrypt request body
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
+		app.logger.Debugf("failed to read body")
+		return
+	}
+
+	bodyDecoded, err := base64.RawURLEncoding.DecodeString(string(bodyBytes))
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		app.logger.Debugf("failed to decode body")
+		return
+	}
+
+	// decrypt
+	nonceSize := app.cipherAEAD.NonceSize()
+	nonce, ciphertext := bodyDecoded[:nonceSize], bodyDecoded[nonceSize:]
+
+	bodyDecrypted, err := app.cipherAEAD.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		app.logger.Debugf("failed to decrypt body")
 		return
 	}
 
 	// right route & authorized, try to do work
-	app.logger.Info("received authorized post to install new key and certificate")
 
 	// decode payload
 	var payload postKeyAndCertPayload
 
-	// decode body into payload
-	err := json.NewDecoder(r.Body).Decode(&payload)
+	// unmarshal decrypted data into payload
+	err = json.Unmarshal(bodyDecrypted, &payload)
 	if err != nil {
 		app.logger.Errorf("failed to decode payload from lego post (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)
