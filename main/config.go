@@ -122,7 +122,7 @@ func configureApp() (*app, error) {
 		logger:     logger,
 		cfg:        &config{},
 		httpClient: newHttpClient(),
-		tlsCert:    NewSafeCert(nil),
+		tlsCert:    NewSafeCert(),
 	}
 
 	// make rest of config

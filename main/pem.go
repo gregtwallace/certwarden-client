@@ -9,11 +9,17 @@ import (
 // generates any additional file formats specified in config
 func (app *app) processPem(keyPem, certPem []byte) error {
 	// update app's key/cert (validates the pair as well, tls won't work if bad)
-	err := app.tlsCert.Update(keyPem, certPem)
+	updated, err := app.tlsCert.Update(keyPem, certPem)
 	if err != nil {
 		return fmt.Errorf("failed to key and/or cert in lego client tls cert (%s)", err)
 	}
-	app.logger.Infof("new tls cert and key installed in https server")
+
+	if !updated {
+		app.logger.Infof("new tls cert and key same as 	current, no update performed")
+		return nil
+	} else {
+		app.logger.Infof("new tls cert and key installed in https server")
+	}
 
 	// save pem files to disk
 	err = os.WriteFile(app.cfg.CertStoragePath+"/key.pem", keyPem, app.cfg.KeyPermissions)
