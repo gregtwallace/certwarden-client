@@ -33,13 +33,17 @@ func (sc *SafeCert) TlsCertFunc() func(*tls.ClientHelloInfo) (*tls.Certificate, 
 }
 
 // Update updates the certificate with the specified key and cert pem
-func (sc *SafeCert) Update(keyPem, certPem []byte) (updated bool, err error) {
+func (sc *SafeCert) Update(keyPem, certPem []byte) (keyUpdated, certUpdated bool, err error) {
 	sc.Lock()
 	defer sc.Unlock()
 
+	// check if pem is new
+	keyUpdated = !bytes.Equal(sc.keyPem, keyPem)
+	certUpdated = !bytes.Equal(sc.certPem, certPem)
+
 	// if no update to do, don't do anything
-	if bytes.Equal(sc.keyPem, keyPem) && bytes.Equal(sc.certPem, certPem) {
-		return false, nil
+	if !keyUpdated && !certUpdated {
+		return keyUpdated, certUpdated, nil
 	}
 
 	// update pem in cert struct
@@ -49,11 +53,11 @@ func (sc *SafeCert) Update(keyPem, certPem []byte) (updated bool, err error) {
 	// make tls certificate
 	tlsCert, err := tls.X509KeyPair(certPem, keyPem)
 	if err != nil {
-		return false, fmt.Errorf("failed to make x509 key pair for cert update (%s)", err)
+		return false, false, fmt.Errorf("failed to make x509 key pair for tls cert update (%s)", err)
 	}
 
 	// update certificate
 	sc.cert = &tlsCert
 
-	return true, nil
+	return keyUpdated, certUpdated, nil
 }

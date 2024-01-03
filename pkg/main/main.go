@@ -1,8 +1,6 @@
 package main
 
 import (
-	"errors"
-	"os"
 	"time"
 )
 
@@ -18,31 +16,14 @@ func main() {
 		// os.Exit(1)
 	}
 
-	// make cert storage path (if not exist)
-	_, err = os.Stat(app.cfg.CertStoragePath)
-	if errors.Is(err, os.ErrNotExist) {
-		err = os.MkdirAll(app.cfg.CertStoragePath, 0755)
-		if err != nil {
-			app.logger.Fatalf("failed to make cert storage directory (%s)", err)
-			// os.Exit(1)
-		} else {
-			app.logger.Infof("cert storage path created")
-		}
-	} else if err != nil {
-		app.logger.Fatalf("failed to stat cert storage directory (%s)", err)
-		// os.Exit(1)
-	}
-
-	// TODO: (?) Add loop with exponential backoff as opposed to fatal?
-
-	// do initial cert update on disk
+	// create or (if needed) update existing key/cert in storage
 	keyPem, certPem, err := app.fetchKeyAndCertchain()
 	if err != nil {
 		app.logger.Fatalf("failed to fetch initial key and/or cert from LeGo (%s)", err)
 		// os.Exit(1)
 	}
 
-	err = app.processPem(keyPem, certPem)
+	err = app.update(keyPem, certPem)
 	if err != nil {
 		app.logger.Fatalf("failed to process initial key and/or cert file(s) (%s)", err)
 		// os.Exit(1)

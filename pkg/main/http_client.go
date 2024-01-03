@@ -12,7 +12,7 @@ import (
 
 // httpClient is a custom http.Client that includes userAgent
 type httpClient struct {
-	http      http.Client
+	http      *http.Client
 	userAgent string
 }
 
@@ -23,7 +23,7 @@ func newHttpClient() (client *httpClient) {
 
 	// create *Client
 	client = &httpClient{
-		http: http.Client{
+		http: &http.Client{
 			// set client timeout
 			Timeout:   30 * time.Second,
 			Transport: http.DefaultTransport,

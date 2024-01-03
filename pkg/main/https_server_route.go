@@ -68,7 +68,7 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// process and install new key/cert
-	err = app.processPem([]byte(payload.KeyPem), []byte(payload.CertPem))
+	err = app.update([]byte(payload.KeyPem), []byte(payload.CertPem))
 	if err != nil {
 		app.logger.Errorf("failed to process key and/or cert file(s) from lego post (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)

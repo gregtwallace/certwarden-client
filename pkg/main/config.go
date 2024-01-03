@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
+
+	dockerClient "github.com/docker/docker/client"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -28,9 +31,12 @@ import (
 //		LEGO_CERTHUB_CLIENT_CERT_APIKEY			- API Key of certificate in LeGo server
 
 // Optional:
-//		LEGO_CERTHUB_CLIENT_LOGLEVEL				- zap log level for the app
-//		LEGO_CERTHUB_CLIENT_BIND_ADDRESS		- address to bind the https server to
-//		LEGO_CERTHUB_CLIENT_BIND_PORT				- https server port
+//    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER0 - name of a container to restart via docker sock on cert update (useful for containers that need to restart to update certs)
+//    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER1 - another container name that should be restarted (keep adding 1 to the number for more)
+//		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER2 ... etc.
+//		LEGO_CERTHUB_CLIENT_LOGLEVEL									- zap log level for the app
+//		LEGO_CERTHUB_CLIENT_BIND_ADDRESS							- address to bind the https server to
+//		LEGO_CERTHUB_CLIENT_BIND_PORT									- https server port
 
 // 		LEGO_CERTHUB_CLIENT_CERT_PATH				- the path to save all keys and certificates to
 //    LEGO_CERTHUB_CLIENT_KEY_PERM				- permissions for files containing the key
@@ -76,29 +82,31 @@ type app struct {
 	shutdownContext   context.Context
 	shutdownWaitgroup *sync.WaitGroup
 
-	httpClient *httpClient
-	tlsCert    *SafeCert
-	cipherAEAD cipher.AEAD
+	httpClient      *httpClient
+	dockerAPIClient *dockerClient.Client
+	tlsCert         *SafeCert
+	cipherAEAD      cipher.AEAD
 }
 
 // config holds all of the lego client configuration
 type config struct {
-	BindAddress       string
-	BindPort          int
-	ServerAddress     string
-	KeyName           string
-	KeyApiKey         string
-	CertName          string
-	CertApiKey        string
-	CertStoragePath   string
-	KeyPermissions    fs.FileMode
-	CertPermissions   fs.FileMode
-	PfxCreate         bool
-	PfxFilename       string
-	PfxPassword       string
-	PfxLegacyCreate   bool
-	PfxLegacyFilename string
-	PfxLegacyPassword string
+	BindAddress               string
+	BindPort                  int
+	ServerAddress             string
+	DockerContainersToRestart []string
+	KeyName                   string
+	KeyApiKey                 string
+	CertName                  string
+	CertApiKey                string
+	CertStoragePath           string
+	KeyPermissions            fs.FileMode
+	CertPermissions           fs.FileMode
+	PfxCreate                 bool
+	PfxFilename               string
+	PfxPassword               string
+	PfxLegacyCreate           bool
+	PfxLegacyFilename         string
+	PfxLegacyPassword         string
 }
 
 // configureApp creates the application from environment variables and/or defaults;
@@ -174,6 +182,30 @@ func configureApp() (*app, error) {
 	}
 
 	// optional
+	// LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER (0... etc.)
+	app.cfg.DockerContainersToRestart = []string{}
+	for i := 0; true; i++ {
+		containerName := os.Getenv("LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER" + strconv.Itoa(i))
+		if containerName == "" {
+			// if next number not specified, done
+			break
+		}
+		app.cfg.DockerContainersToRestart = append(app.cfg.DockerContainersToRestart, containerName)
+	}
+	if len(app.cfg.DockerContainersToRestart) > 0 {
+		app.dockerAPIClient, err = dockerClient.NewClientWithOpts()
+		if err != nil {
+			return app, fmt.Errorf("specified LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER but couldn't make docker api client (%s)", err)
+		}
+
+		testPingCtx, cancelPing := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelPing()
+		_, err := app.dockerAPIClient.Ping(testPingCtx)
+		if err != nil {
+			app.logger.Errorf("specified LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER but couldn't connect to docker api (%s), verify access to docker or restarts will not occur", err)
+		}
+	}
+
 	// LEGO_CERTHUB_CLIENT_BIND_ADDRESS
 	app.cfg.BindAddress = os.Getenv("LEGO_CERTHUB_CLIENT_BIND_ADDRESS")
 	if app.cfg.BindAddress == "" {
@@ -269,6 +301,38 @@ func configureApp() (*app, error) {
 		if !exists {
 			app.logger.Debugf("LEGO_CERTHUB_CLIENT_PFX_LEGACY_PASSWORD not specified, using default \"%s\"", defaultPFXLegacyPassword)
 			app.cfg.PfxLegacyPassword = defaultPFXLegacyPassword
+		}
+	}
+
+	// end config vars
+
+	// make cert storage path (if not exist)
+	_, err = os.Stat(app.cfg.CertStoragePath)
+	if errors.Is(err, os.ErrNotExist) {
+		err = os.MkdirAll(app.cfg.CertStoragePath, 0755)
+		if err != nil {
+			return app, fmt.Errorf("failed to make cert storage directory (%s)", err)
+		} else {
+			app.logger.Infof("cert storage path created")
+		}
+	} else if err != nil {
+		return app, fmt.Errorf("failed to stat cert storage directory (%s)", err)
+	}
+
+	// read existing key/cert pem from disk
+	cert, err := os.ReadFile(app.cfg.CertStoragePath + "/certchain.pem")
+	if err != nil {
+		app.logger.Infof("could not read cert from disk (%s), will fetch from remote", err)
+	} else {
+		key, err := os.ReadFile(app.cfg.CertStoragePath + "/key.pem")
+		if err != nil {
+			app.logger.Infof("could not read key from disk (%s), will fetch from remote", err)
+		} else {
+			// read both key and cert, put them in tlsCert
+			_, _, err := app.tlsCert.Update(key, cert)
+			if err != nil {
+				app.logger.Errorf("could not use key/cert pair from disk (%s), will fetch from remote", err)
+			}
 		}
 	}
 
