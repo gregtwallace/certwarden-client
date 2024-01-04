@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -23,7 +24,7 @@ import (
 
 // Environment Variables (to configure client):
 // Mandatory:
-//    LEGO_CERTHUB_CLIENT_SECRET_KEY			- secret key used for communication between LeGo server and client; recommend using the server to generate one (MUST be 32 bytes)
+//    LEGO_CERTHUB_CLIENT_AES_KEY_BASE64  - base64 raw url encoding of AES key used for communication between LeGo server and client (generate one on LeGo server)
 //		LEGO_CERTHUB_CLIENT_SERVER_ADDRESS	-	DNS name of the LeGo server. Must start with https and have a valid ssl certificate.
 //		LEGO_CERTHUB_CLIENT_KEY_NAME				-	Name of private key in LeGo server
 //		LEGO_CERTHUB_CLIENT_KEY_APIKEY			- API Key of private key in LeGo server
@@ -137,12 +138,16 @@ func configureApp() (*app, error) {
 
 	// mandatory
 
-	// LEGO_CERTHUB_CLIENT_SECRET_KEY
-	secret := os.Getenv("LEGO_CERTHUB_CLIENT_SECRET_KEY")
-	if len(secret) != 32 {
-		return app, errors.New("LEGO_CERTHUB_CLIENT_SECRET_KEY is required and must be 32 bytes long")
+	// LEGO_CERTHUB_CLIENT_AES_KEY_BASE64
+	secretB64 := os.Getenv("LEGO_CERTHUB_CLIENT_AES_KEY_BASE64")
+	aesKey, err := base64.RawURLEncoding.DecodeString(secretB64)
+	if err != nil {
+		return app, errors.New("LEGO_CERTHUB_CLIENT_AES_KEY_BASE64 is not a valid base64 raw url encoded string")
 	}
-	aes, err := aes.NewCipher([]byte(secret))
+	if len(aesKey) != 32 {
+		return app, errors.New("LEGO_CERTHUB_CLIENT_AES_KEY_BASE64 AES key is not 32 bytes long")
+	}
+	aes, err := aes.NewCipher(aesKey)
 	if err != nil {
 		return app, fmt.Errorf("failed to make aes cipher from secret key (%s)", err)
 	}
