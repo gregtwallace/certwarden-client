@@ -58,6 +58,7 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// right route & authorized, try to do work
+	app.logger.Infof("authenticated payload received from %s", r.RemoteAddr)
 
 	// decode payload
 	innerPayload := innerPayload{}
