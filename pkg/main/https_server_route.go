@@ -3,19 +3,24 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
-	"io"
 	"net/http"
 )
 
 const (
-	authHeader = "Authorization"
-	postRoute  = "/legocerthubclient/api/v1/install"
+	postRoute = "/legocerthubclient/api/v1/install"
 )
 
-// postKeyAndCertPayload is the data the LeGo server sends to the client
-type postKeyAndCertPayload struct {
+// innerPayload is the struct for the unencrypted data that is inside the payload sent from
+// LeGo to the client
+type innerPayload struct {
 	KeyPem  string `json:"key_pem"`
 	CertPem string `json:"cert_pem"`
+}
+
+// postPayload is the actual payload sent from LeGo to the client
+type postPayload struct {
+	// Payload is the base64 encoded string of the cipherData produced from encrypting innerPayload
+	Payload string `json:"payload"`
 }
 
 func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
@@ -25,21 +30,19 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// resp vary header
-	w.Header().Add("Vary", authHeader)
-
-	// read, decode, and try to decrypt request body
-	bodyBytes, err := io.ReadAll(r.Body)
+	// decode body into payload
+	payload := postPayload{}
+	err := json.NewDecoder(r.Body).Decode(&payload)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		app.logger.Debugf("failed to read body")
+		app.logger.Debugf("failed to umarshal body (%s)", err)
 		return
 	}
 
-	bodyDecoded, err := base64.RawURLEncoding.DecodeString(string(bodyBytes))
+	bodyDecoded, err := base64.RawURLEncoding.DecodeString(payload.Payload)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		app.logger.Debugf("failed to decode body")
+		app.logger.Debugf("failed to decode inner payload (%s)", err)
 		return
 	}
 
@@ -50,25 +53,25 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	bodyDecrypted, err := app.cipherAEAD.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		app.logger.Debugf("failed to decrypt body")
+		app.logger.Debugf("failed to decrypt inner payload (%s)", err)
 		return
 	}
 
 	// right route & authorized, try to do work
 
 	// decode payload
-	var payload postKeyAndCertPayload
+	innerPayload := innerPayload{}
 
 	// unmarshal decrypted data into payload
-	err = json.Unmarshal(bodyDecrypted, &payload)
+	err = json.Unmarshal(bodyDecrypted, &innerPayload)
 	if err != nil {
-		app.logger.Errorf("failed to decode payload from lego post (%s)", err)
+		app.logger.Errorf("failed to umarshal decrypted inner payload (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	// process and install new key/cert
-	err = app.update([]byte(payload.KeyPem), []byte(payload.CertPem))
+	err = app.update([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem))
 	if err != nil {
 		app.logger.Errorf("failed to process key and/or cert file(s) from lego post (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)
