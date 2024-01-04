@@ -2,7 +2,8 @@
 /.vscode
 
 # internal testing
-# env script
+# run w/ env script
 /run-test.ps1
+/run-test-docker.ps1
 # out dir
 /out
