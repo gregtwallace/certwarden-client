@@ -58,7 +58,7 @@ const (
 	defaultBindAddress = ""
 	defaultBindPort    = 5055
 
-	defaultCertStoragePath = "/opt/legoclient/certs"
+	defaultCertStoragePath = "/opt/lego/certs"
 	defaultKeyPermissions  = fs.FileMode(0640)
 	defaultCertPermissions = fs.FileMode(0644)
 
