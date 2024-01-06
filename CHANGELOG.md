@@ -4,6 +4,11 @@ NOTE: This application is not yet intended for general use.
 
 ## [v0.1.1] - 2024-01-06
 
+Add docker API version negotiation.
+
+
+## [v0.1.1] - 2024-01-06
+
 Change default cert storage path.
 
 
