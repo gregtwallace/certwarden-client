@@ -198,7 +198,7 @@ func configureApp() (*app, error) {
 		app.cfg.DockerContainersToRestart = append(app.cfg.DockerContainersToRestart, containerName)
 	}
 	if len(app.cfg.DockerContainersToRestart) > 0 {
-		app.dockerAPIClient, err = dockerClient.NewClientWithOpts()
+		app.dockerAPIClient, err = dockerClient.NewClientWithOpts(dockerClient.WithAPIVersionNegotiation())
 		if err != nil {
 			return app, fmt.Errorf("specified LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER but couldn't make docker api client (%s)", err)
 		}
