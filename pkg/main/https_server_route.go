@@ -71,13 +71,18 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// process and install new key/cert
-	err = app.update([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem))
+	// process and install new key/cert in client (will error if bad)
+	err = app.updateClientCert([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem))
 	if err != nil {
 		app.logger.Errorf("failed to process key and/or cert file(s) from lego post (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
+
+	// schedule file update (which will cancel any other pending job, since it isn't needed when
+	// new payload is received from server via this handler) -- if files on disc don't actually
+	// need an update, logic will deal with it later in the job (and just not write files)
+	app.scheduleJobWriteCertsMemoryToDisk()
 
 	w.WriteHeader(http.StatusOK)
 }

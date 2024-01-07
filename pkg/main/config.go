@@ -32,9 +32,13 @@ import (
 //		LEGO_CERTHUB_CLIENT_CERT_APIKEY			- API Key of certificate in LeGo server
 
 // Optional:
-//    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER0 - name of a container to restart via docker sock on cert update (useful for containers that need to restart to update certs)
+//		LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME					- 24-hour time when key/cert updates are written to filesystem
+
+//    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER0 - name of a container to restart via docker sock on key/cert file update (useful for containers that need to restart to update certs)
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER1 - another container name that should be restarted (keep adding 1 to the number for more)
 //		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER2 ... etc.
+//		Note: Restart is based on file update, so use the var above to set a file update time
+
 //		LEGO_CERTHUB_CLIENT_LOGLEVEL									- zap log level for the app
 //		LEGO_CERTHUB_CLIENT_BIND_ADDRESS							- address to bind the https server to
 //		LEGO_CERTHUB_CLIENT_BIND_PORT									- https server port
@@ -54,6 +58,9 @@ import (
 
 // defaults for Optional vars
 const (
+	defaultUpdateTimeHour   = 1
+	defaultUpdateTimeMinute = 15
+
 	defaultLogLevel    = zapcore.InfoLevel
 	defaultBindAddress = ""
 	defaultBindPort    = 5055
@@ -71,6 +78,8 @@ const (
 	defaultPFXLegacyPassword = ""
 )
 
+var defaultUpdateTimeString = fmt.Sprintf("%d:%d", defaultUpdateTimeHour, defaultUpdateTimeMinute)
+
 //
 //
 //
@@ -83,6 +92,8 @@ type app struct {
 	shutdownContext   context.Context
 	shutdownWaitgroup *sync.WaitGroup
 
+	pendingJobCancel context.CancelFunc
+
 	httpClient      *httpClient
 	dockerAPIClient *dockerClient.Client
 	tlsCert         *SafeCert
@@ -94,6 +105,8 @@ type config struct {
 	BindAddress               string
 	BindPort                  int
 	ServerAddress             string
+	FileUpdateTimeString      string
+	FileUpdateDayOfWeek       time.Weekday
 	DockerContainersToRestart []string
 	KeyName                   string
 	KeyApiKey                 string
@@ -108,6 +121,21 @@ type config struct {
 	PfxLegacyCreate           bool
 	PfxLegacyFilename         string
 	PfxLegacyPassword         string
+}
+
+// parseTime is a helper for time parsing that returns the hour and
+// minute ints
+func parseTimeString(timeStr string) (hour int, min int, err error) {
+	splitTime := strings.Split(timeStr, ":")
+	if len(splitTime) == 2 {
+		hourInt, hourErr := strconv.Atoi(splitTime[0])
+		minInt, minErr := strconv.Atoi(splitTime[1])
+		if hourErr == nil && minErr == nil && hourInt >= 0 && hourInt <= 23 && minInt >= 0 && minInt <= 59 {
+			return hourInt, minInt, nil
+		}
+	}
+
+	return -1, -1, errors.New("invalid time specified (use 24 hour format, e.g. 18:05 for 6:05 PM)")
 }
 
 // configureApp creates the application from environment variables and/or defaults;
@@ -187,6 +215,15 @@ func configureApp() (*app, error) {
 	}
 
 	// optional
+
+	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME
+	app.cfg.FileUpdateTimeString = os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME")
+	_, _, err = parseTimeString(app.cfg.FileUpdateTimeString)
+	if err != nil {
+		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME not specified or invalid, using time %s", defaultUpdateTimeString)
+		app.cfg.FileUpdateTimeString = defaultUpdateTimeString
+	}
+
 	// LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER (0... etc.)
 	app.cfg.DockerContainersToRestart = []string{}
 	for i := 0; true; i++ {
@@ -327,16 +364,16 @@ func configureApp() (*app, error) {
 	// read existing key/cert pem from disk
 	cert, err := os.ReadFile(app.cfg.CertStoragePath + "/certchain.pem")
 	if err != nil {
-		app.logger.Infof("could not read cert from disk (%s), will fetch from remote", err)
+		app.logger.Infof("could not read cert from disk (%s), will try fetch from remote", err)
 	} else {
 		key, err := os.ReadFile(app.cfg.CertStoragePath + "/key.pem")
 		if err != nil {
-			app.logger.Infof("could not read key from disk (%s), will fetch from remote", err)
+			app.logger.Infof("could not read key from disk (%s), will try fetch from remote", err)
 		} else {
 			// read both key and cert, put them in tlsCert
-			_, _, err := app.tlsCert.Update(key, cert)
+			_, err := app.tlsCert.Update(key, cert)
 			if err != nil {
-				app.logger.Errorf("could not use key/cert pair from disk (%s), will fetch from remote", err)
+				app.logger.Errorf("could not use key/cert pair from disk (%s), will try fetch from remote", err)
 			}
 		}
 	}

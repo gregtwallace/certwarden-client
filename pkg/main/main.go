@@ -12,29 +12,54 @@ func main() {
 	// configure app
 	app, err := configureApp()
 	if err != nil {
+		// only fails if config is bad, so fatal ok
 		app.logger.Fatalf("failed to configure app (%s)", err)
 		// os.Exit(1)
 	}
 
-	// create or (if needed) update existing key/cert in storage
-	keyPem, certPem, err := app.fetchKeyAndCertchain()
+	// try and get newer key/cert from lego server on start
+	currentCertInMemory := false
+	err = app.updateClientKeyAndCertchain()
 	if err != nil {
-		app.logger.Fatalf("failed to fetch initial key and/or cert from LeGo (%s)", err)
+		app.logger.Errorf("failed to fetch key/cert from lego server (%s)", err)
+	} else {
+		currentCertInMemory = true
+	}
+
+	// Fatal if never got a valid TLS certificate (either local or from fetch)
+	if !app.tlsCert.HasValidTLSCertificate() {
+		app.logger.Fatal("no certificate was available locally or via remote fetch, exiting")
 		// os.Exit(1)
 	}
 
-	err = app.update(keyPem, certPem)
-	if err != nil {
-		app.logger.Fatalf("failed to process initial key and/or cert file(s) (%s)", err)
-		// os.Exit(1)
+	// write files to disc; if file update time was specified, do NOT write files if they already
+	// exist and cert isn't expired
+	onlyIfMissing := app.cfg.FileUpdateTimeString != ""
+	diskNeedsUpdate := app.updateCertFilesAndRestartContainers(onlyIfMissing)
+
+	// if app failed to get newest cert from LeGo or the disk needs an update written, schedule an update
+	// job to try again
+	if !currentCertInMemory {
+		// failed to get from LeGo server, schedule fetch and update
+		app.scheduleJobFetchCertsAndWriteToDisk()
+	} else if diskNeedsUpdate {
+		// fetch was fine but files not written yet, schedule file write
+		app.scheduleJobWriteCertsMemoryToDisk()
 	}
 
 	// start https server
-	_ = app.startHttpsServer()
+	err = app.startHttpsServer()
+	if err != nil {
+		app.logger.Fatal("could not start https server (%s)")
+		// os.Exit(1)
+	}
 
 	// shutdown logic
 	// wait for shutdown context to signal
 	<-app.shutdownContext.Done()
+
+	// cancel any pending job
+	app.pendingJobCancel()
 
 	// wait for each component/service to shutdown
 	// but also implement a maxWait chan to force close (panic)
