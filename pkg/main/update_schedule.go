@@ -6,6 +6,14 @@ import (
 	"time"
 )
 
+// nextWeeklyDay returns the day of the month that is the first occurence of
+// the specified weekday after the specified time
+func nextWeeklyDay(t time.Time, weekday time.Weekday) int {
+	days := int((7 + (weekday - t.Weekday())) % 7)
+	_, _, day := t.AddDate(0, 0, days).Date()
+	return day
+}
+
 // scheduleJobWriteCertsMemoryToDisk schedules a job to write the new cert files
 // using data already loaded into the client cert. This is used when the client
 // launched with valid key/cert files but newer ones were found on the lego
@@ -25,17 +33,28 @@ func (app *app) scheduleJobWriteCertsMemoryToDisk() {
 		app.pendingJobCancel = cancel
 
 		// determine when this job should run and log it
-		now := time.Now()
+		now := time.Now().Round(time.Second)
+		day := now.Day()
+
+		// if weekday is selected, find next day
+		if app.cfg.FileUpdateDayOfWeek >= 0 && app.cfg.FileUpdateDayOfWeek < 7 {
+			day = nextWeeklyDay(now, app.cfg.FileUpdateDayOfWeek)
+		}
+
 		runHr, runMin, err := parseTimeString(app.cfg.FileUpdateTimeString)
 		if err != nil {
 			app.logger.Errorf("somehow an invalid time string exists (%s) in config, please report bug", app.cfg.FileUpdateTimeString)
 			runHr = defaultUpdateTimeHour
 			runMin = defaultUpdateTimeMinute
 		}
-		runTime := time.Date(now.Year(), now.Month(), now.Day(), runHr, runMin, 0, now.Nanosecond(), now.Location())
-		// if run time past for today, add a day
+		runTime := time.Date(now.Year(), now.Month(), day, runHr, runMin, 0, now.Nanosecond(), now.Location())
+		// if run time past for today, add a day (or week if only running weekly)
 		if now.After(runTime) {
-			runTime = runTime.Add(24 * time.Hour)
+			if app.cfg.FileUpdateDayOfWeek >= 0 && app.cfg.FileUpdateDayOfWeek < 7 {
+				runTime = runTime.Add(7 * 24 * time.Hour)
+			} else {
+				runTime = runTime.Add(24 * time.Hour)
+			}
 		}
 		// add random second
 		runTime = runTime.Add(time.Duration(rand.Intn(60)) * time.Second)
@@ -87,7 +106,7 @@ func (app *app) scheduleJobFetchCertsAndWriteToDisk() {
 		app.pendingJobCancel = cancel
 
 		// fetch job will only wait 15 minutes (since no file write or docker restart will trigger)
-		runTime := time.Now().Add(15 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
+		runTime := time.Now().Round(time.Second).Add(15 * time.Minute).Add(time.Duration(rand.Intn(60)) * time.Second)
 		runTimeString := runTime.String()
 
 		app.logger.Infof("scheduling fetch certs job for %s", runTimeString)

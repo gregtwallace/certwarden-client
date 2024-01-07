@@ -33,11 +33,12 @@ import (
 
 // Optional:
 //		LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME					- 24-hour time when key/cert updates are written to filesystem
+// 		LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK		- Day of the week to write updated key/cert to filesystem (blank is any)
 
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER0 - name of a container to restart via docker sock on key/cert file update (useful for containers that need to restart to update certs)
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER1 - another container name that should be restarted (keep adding 1 to the number for more)
 //		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER2 ... etc.
-//		Note: Restart is based on file update, so use the var above to set a file update time
+//		Note: Restart is based on file update, so use the vars above to set a file update time / day of week
 
 //		LEGO_CERTHUB_CLIENT_LOGLEVEL									- zap log level for the app
 //		LEGO_CERTHUB_CLIENT_BIND_ADDRESS							- address to bind the https server to
@@ -60,6 +61,7 @@ import (
 const (
 	defaultUpdateTimeHour   = 1
 	defaultUpdateTimeMinute = 15
+	defaultUpdateDayOfWeek  = ""
 
 	defaultLogLevel    = zapcore.InfoLevel
 	defaultBindAddress = ""
@@ -121,6 +123,35 @@ type config struct {
 	PfxLegacyCreate           bool
 	PfxLegacyFilename         string
 	PfxLegacyPassword         string
+}
+
+// helper weekday map & func
+var daysOfWeek = map[string]time.Weekday{
+	"sunday":    time.Sunday,
+	"monday":    time.Monday,
+	"tuesday":   time.Tuesday,
+	"wednesday": time.Wednesday,
+	"thursday":  time.Thursday,
+	"friday":    time.Friday,
+	"saturday":  time.Saturday,
+
+	"sun": time.Sunday,
+	"mon": time.Monday,
+	"tue": time.Tuesday,
+	"wed": time.Wednesday,
+	"thu": time.Thursday,
+	"fri": time.Friday,
+	"sat": time.Saturday,
+}
+
+func parseWeekday(weekdayName string) (time.Weekday, error) {
+	weekdayLower := strings.ToLower(weekdayName)
+
+	if wd, ok := daysOfWeek[weekdayLower]; ok {
+		return wd, nil
+	}
+
+	return -1, fmt.Errorf("invalid weekday '%s'", weekdayName)
 }
 
 // parseTime is a helper for time parsing that returns the hour and
@@ -223,6 +254,25 @@ func configureApp() (*app, error) {
 		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME not specified or invalid, using time %s", defaultUpdateTimeString)
 		app.cfg.FileUpdateTimeString = defaultUpdateTimeString
 	}
+
+	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK
+	weekdayStr := os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK")
+	weekday, err := parseWeekday(weekdayStr)
+	if weekdayStr == "" || err != nil {
+		// invalid weekday val (will be used to signal any)
+		app.cfg.FileUpdateDayOfWeek = -1
+		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK not specified or invalid, key/cert file updates will occur on any day")
+	} else {
+		// valid weekday
+		app.cfg.FileUpdateDayOfWeek = weekday
+	}
+
+	// log file write plan
+	dayOfWeekLogText := "any day of the week"
+	if app.cfg.FileUpdateDayOfWeek >= 0 && app.cfg.FileUpdateDayOfWeek < 7 {
+		dayOfWeekLogText = app.cfg.FileUpdateDayOfWeek.String() + "s"
+	}
+	app.logger.Infof("new key/cert files will be written on %s at %s", dayOfWeekLogText, app.cfg.FileUpdateTimeString)
 
 	// LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER (0... etc.)
 	app.cfg.DockerContainersToRestart = []string{}
