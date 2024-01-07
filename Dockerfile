@@ -3,7 +3,7 @@
 
 # example run
 # NOTE: If you don't want or need auto container restart, you can skip mounting docker.sock
-# docker run -d --name legocerthub-client -v /var/run/docker.sock:/var/run/docker.sock -p 5055:5055 -e [config vars here] ghcr.io/gregtwallace/legocerthub-client:latest
+# docker run -d --name legocerthub-client -e TZ=Europe/Stockholm -v /var/run/docker.sock:/var/run/docker.sock -p 5055:5055 -e [config vars here] ghcr.io/gregtwallace/legocerthub-client:latest
 
 # Versions - keep in sync with build_releases.yml
 ARG ALPINE_VERSION=3.17
@@ -25,6 +25,9 @@ RUN apk add git && \
 FROM alpine:${ALPINE_VERSION}
 
 WORKDIR /app
+
+# timezone support
+RUN apk add --no-cache tzdata
 
 # copy app
 COPY --from=build /src/lego-client-linux-amd64 .

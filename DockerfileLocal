@@ -22,6 +22,9 @@ FROM alpine:${ALPINE_VERSION}
 
 WORKDIR /app
 
+# timezone support
+RUN apk add --no-cache tzdata
+
 # copy app
 COPY --from=build /src/lego-client-linux-amd64 .
 COPY ./README.md .
