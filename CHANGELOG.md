@@ -2,6 +2,11 @@
 
 NOTE: This application is not yet intended for general use.
 
+## [v0.1.5] - 2024-01-10
+
+- Fix incorrect scheduling of file write job when not needed.
+
+
 ## [v0.1.4] - 2024-01-10
 
 - Add timezone support.
