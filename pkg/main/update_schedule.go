@@ -85,11 +85,9 @@ func (app *app) nextFileUpdateWindowStart() time.Time {
 	return nextWindow.Add(time.Duration(addDays) * 24 * time.Hour)
 }
 
-// scheduleJobWriteCertsMemoryToDisk schedules a job to write the new cert files
-// using data already loaded into the client cert. This is used when the client
-// launched with valid key/cert files but newer ones were found on the lego
-// server. If the current time is within a permitted write time, the job runs
-// immediately
+// scheduleJobWriteCertsMemoryToDisk schedules a job to write the lego client's
+// key/cert pem from memory to disk (and generate any additional files on disk that
+// are configured)
 func (app *app) scheduleJobWriteCertsMemoryToDisk() {
 	go func() {
 		// cancel any old job
@@ -147,9 +145,10 @@ func (app *app) scheduleJobWriteCertsMemoryToDisk() {
 	}()
 }
 
-// scheduleJobFetchCertsAndWriteToDisk fetches the latest key/cert from LeGo
-// updates the client's key/cert. It repeats this task every 15 minutes until
-// it succeeds. Then it schedules a job to write the new files to disk.
+// scheduleJobFetchCertsAndWriteToDisk fetches the latest key/cert from LeGo server
+// and updates the client's key/cert. It repeats this task every 15 minutes until
+// it succeeds. Then it schedules a job to write lego client's key/cert pem from
+// memory to disk (along with any other files that are configured).
 func (app *app) scheduleJobFetchCertsAndWriteToDisk() {
 	go func() {
 		// cancel any old job

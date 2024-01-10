@@ -79,10 +79,21 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// schedule file update (which will cancel any other pending job, since it isn't needed when
-	// new payload is received from server via this handler) -- if files on disc don't actually
-	// need an update, logic will deal with it later in the job (and just not write files)
-	app.scheduleJobWriteCertsMemoryToDisk()
+	// run go routine to update files; first run update immediately to check for missing files
+	// which also returns if the disk needs an update. Then schedule job if the disk needs an
+	// update. If no disk update is needed, ensure cancel any old pending job.
+	go func() {
+		// write files to disk now if file(s) are missing
+		diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
+
+		// schedule job if disk still needs an update
+		if diskNeedsUpdate {
+			app.scheduleJobWriteCertsMemoryToDisk()
+		} else if app.pendingJobCancel != nil {
+			// cancel any old pending job if no update needed and there is a job to cancel
+			app.pendingJobCancel()
+		}
+	}()
 
 	w.WriteHeader(http.StatusOK)
 }
