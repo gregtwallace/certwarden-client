@@ -2,6 +2,14 @@
 
 NOTE: This application is not yet intended for general use.
 
+## [v0.1.4] - 2024-01-10
+
+- Add timezone support.
+- Change writing files options from specific time to a time window.
+- Support multiple weekday selection for write windows.
+- Add option to stop docker containers instead of restart.
+
+
 ## [v0.1.3] - 2024-01-06
 
 Add file write update schedule. Files will only be written at 
