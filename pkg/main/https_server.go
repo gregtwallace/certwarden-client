@@ -30,12 +30,12 @@ func (app *app) startHttpsServer() error {
 	}
 
 	// launch https
-	app.logger.Infof("starting lego-certhub-client bound to %s", srv.Addr)
+	app.logger.Infof("starting lego-certhub-client https server bound to %s", srv.Addr)
 
 	// create listener for web server
 	ln, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
-		return fmt.Errorf("lego-certhub-client server cannot bind to %s (%s), exiting", srv.Addr, err)
+		return fmt.Errorf("lego-certhub-client https server cannot bind to %s (%s), exiting", srv.Addr, err)
 	}
 
 	// start server
@@ -45,7 +45,7 @@ func (app *app) startHttpsServer() error {
 
 		err := srv.ServeTLS(ln, "", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			app.logger.Errorf("lego-certhub-client server returned error (%s)", err)
+			app.logger.Errorf("lego-certhub-client https server returned error (%s)", err)
 		}
 
 		app.logger.Info("https server shutdown complete")
