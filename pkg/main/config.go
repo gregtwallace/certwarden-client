@@ -41,6 +41,7 @@ import (
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER1 - another container name that should be restarted (keep adding 1 to the number for more)
 //		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER2 ... etc.
 //		Note: Restart is based on file update, so use the vars above to set a file update time window and day(s) of week
+//		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_STOP_ONLY	- if 'true' docker containers will be stopped instead of restarted (this is useful if another process like systemctl will start them back up)
 
 //		LEGO_CERTHUB_CLIENT_LOGLEVEL									- zap log level for the app
 //		LEGO_CERTHUB_CLIENT_BIND_ADDRESS							- address to bind the https server to
@@ -66,6 +67,8 @@ const (
 	defaultUpdateTimeEndHour     = 5
 	defaultUpdateTimeEndMinute   = 0
 	defaultUpdateDayOfWeek       = ""
+
+	defaultRestartDockerStopOnly = false
 
 	defaultLogLevel    = zapcore.InfoLevel
 	defaultBindAddress = ""
@@ -116,6 +119,7 @@ type config struct {
 	FileUpdateTimeIncludesMidnight bool
 	FileUpdateDaysOfWeek           map[time.Weekday]struct{}
 	DockerContainersToRestart      []string
+	DockerStopOnly                 bool
 	KeyName                        string
 	KeyApiKey                      string
 	CertName                       string
@@ -276,6 +280,20 @@ func configureApp() (*app, error) {
 		if err != nil {
 			app.logger.Errorf("specified LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER but couldn't connect to docker api (%s), verify access to docker or restarts will not occur", err)
 		}
+	}
+
+	// LEGO_CERTHUB_CLIENT_RESTART_DOCKER_STOP_ONLY
+	dockerStopOnlyStr := os.Getenv("LEGO_CERTHUB_CLIENT_RESTART_DOCKER_STOP_ONLY")
+	if dockerStopOnlyStr == "true" {
+		app.cfg.DockerStopOnly = true
+	} else if dockerStopOnlyStr == "false" {
+		app.cfg.DockerStopOnly = false
+	} else {
+		app.logger.Debugf("LEGO_CERTHUB_CLIENT_RESTART_DOCKER_STOP_ONLY not specified or invalid, using default \"%s\"", defaultRestartDockerStopOnly)
+		app.cfg.DockerStopOnly = defaultRestartDockerStopOnly
+	}
+	if app.cfg.DockerStopOnly {
+		app.logger.Warn("docker containers will only be stopped, not restarted, on cert file updates")
 	}
 
 	// LEGO_CERTHUB_CLIENT_BIND_ADDRESS

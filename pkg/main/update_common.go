@@ -163,10 +163,10 @@ func (app *app) updateCertFilesAndRestartContainers(onlyIfMissing bool) (diskNee
 	// done updating files, restart docker containers (if any files written)
 	if len(app.cfg.DockerContainersToRestart) > 0 {
 		if wroteAnyFiles {
-			app.logger.Info("at least one file changed, restarting containers")
-			app.restartDockerContainers()
+			app.logger.Info("at least one file changed, updating docker containers")
+			app.restartOrStopDockerContainers()
 		} else {
-			app.logger.Debug("not restarting containers, no file changes")
+			app.logger.Debug("not updating docker containers, no file changes")
 		}
 	}
 
