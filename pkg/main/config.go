@@ -32,13 +32,15 @@ import (
 //		LEGO_CERTHUB_CLIENT_CERT_APIKEY			- API Key of certificate in LeGo server
 
 // Optional:
-//		LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME					- 24-hour time when key/cert updates are written to filesystem
-// 		LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK		- Day of the week to write updated key/cert to filesystem (blank is any)
+//		LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_START		- 24-hour time when window opens to write key/cert updates to filesystem
+//		LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_END			- 24-hour time when window closes to write key/cert updates to filesystem
+// 		LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAYS_OF_WEEK	- Day(s) of the week to write updated key/cert to filesystem (blank is any) - separate multiple using spaces
+//		Note: If midnight falls between start and end time, weekday is applied to the start time (e.g. Weds 10p-2a would we Weds 10p - Thu 2a)
 
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER0 - name of a container to restart via docker sock on key/cert file update (useful for containers that need to restart to update certs)
 //    LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER1 - another container name that should be restarted (keep adding 1 to the number for more)
 //		LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER2 ... etc.
-//		Note: Restart is based on file update, so use the vars above to set a file update time / day of week
+//		Note: Restart is based on file update, so use the vars above to set a file update time window and day(s) of week
 
 //		LEGO_CERTHUB_CLIENT_LOGLEVEL									- zap log level for the app
 //		LEGO_CERTHUB_CLIENT_BIND_ADDRESS							- address to bind the https server to
@@ -59,9 +61,11 @@ import (
 
 // defaults for Optional vars
 const (
-	defaultUpdateTimeHour   = 1
-	defaultUpdateTimeMinute = 15
-	defaultUpdateDayOfWeek  = ""
+	defaultUpdateTimeStartHour   = 3
+	defaultUpdateTimeStartMinute = 0
+	defaultUpdateTimeEndHour     = 5
+	defaultUpdateTimeEndMinute   = 0
+	defaultUpdateDayOfWeek       = ""
 
 	defaultLogLevel    = zapcore.InfoLevel
 	defaultBindAddress = ""
@@ -79,8 +83,6 @@ const (
 	defaultPFXLegacyFilename = "key_certchain.legacy.pfx"
 	defaultPFXLegacyPassword = ""
 )
-
-var defaultUpdateTimeString = fmt.Sprintf("%d:%d", defaultUpdateTimeHour, defaultUpdateTimeMinute)
 
 //
 //
@@ -104,69 +106,29 @@ type app struct {
 
 // config holds all of the lego client configuration
 type config struct {
-	BindAddress               string
-	BindPort                  int
-	ServerAddress             string
-	FileUpdateTimeString      string
-	FileUpdateDayOfWeek       time.Weekday
-	DockerContainersToRestart []string
-	KeyName                   string
-	KeyApiKey                 string
-	CertName                  string
-	CertApiKey                string
-	CertStoragePath           string
-	KeyPermissions            fs.FileMode
-	CertPermissions           fs.FileMode
-	PfxCreate                 bool
-	PfxFilename               string
-	PfxPassword               string
-	PfxLegacyCreate           bool
-	PfxLegacyFilename         string
-	PfxLegacyPassword         string
-}
-
-// helper weekday map & func
-var daysOfWeek = map[string]time.Weekday{
-	"sunday":    time.Sunday,
-	"monday":    time.Monday,
-	"tuesday":   time.Tuesday,
-	"wednesday": time.Wednesday,
-	"thursday":  time.Thursday,
-	"friday":    time.Friday,
-	"saturday":  time.Saturday,
-
-	"sun": time.Sunday,
-	"mon": time.Monday,
-	"tue": time.Tuesday,
-	"wed": time.Wednesday,
-	"thu": time.Thursday,
-	"fri": time.Friday,
-	"sat": time.Saturday,
-}
-
-func parseWeekday(weekdayName string) (time.Weekday, error) {
-	weekdayLower := strings.ToLower(weekdayName)
-
-	if wd, ok := daysOfWeek[weekdayLower]; ok {
-		return wd, nil
-	}
-
-	return -1, fmt.Errorf("invalid weekday '%s'", weekdayName)
-}
-
-// parseTime is a helper for time parsing that returns the hour and
-// minute ints
-func parseTimeString(timeStr string) (hour int, min int, err error) {
-	splitTime := strings.Split(timeStr, ":")
-	if len(splitTime) == 2 {
-		hourInt, hourErr := strconv.Atoi(splitTime[0])
-		minInt, minErr := strconv.Atoi(splitTime[1])
-		if hourErr == nil && minErr == nil && hourInt >= 0 && hourInt <= 23 && minInt >= 0 && minInt <= 59 {
-			return hourInt, minInt, nil
-		}
-	}
-
-	return -1, -1, errors.New("invalid time specified (use 24 hour format, e.g. 18:05 for 6:05 PM)")
+	BindAddress                    string
+	BindPort                       int
+	ServerAddress                  string
+	FileUpdateTimeStartHour        int
+	FileUpdateTimeStartMinute      int
+	FileUpdateTimeEndHour          int
+	FileUpdateTimeEndMinute        int
+	FileUpdateTimeIncludesMidnight bool
+	FileUpdateDaysOfWeek           map[time.Weekday]struct{}
+	DockerContainersToRestart      []string
+	KeyName                        string
+	KeyApiKey                      string
+	CertName                       string
+	CertApiKey                     string
+	CertStoragePath                string
+	KeyPermissions                 fs.FileMode
+	CertPermissions                fs.FileMode
+	PfxCreate                      bool
+	PfxFilename                    string
+	PfxPassword                    string
+	PfxLegacyCreate                bool
+	PfxLegacyFilename              string
+	PfxLegacyPassword              string
 }
 
 // configureApp creates the application from environment variables and/or defaults;
@@ -247,32 +209,50 @@ func configureApp() (*app, error) {
 
 	// optional
 
-	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME
-	app.cfg.FileUpdateTimeString = os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME")
-	_, _, err = parseTimeString(app.cfg.FileUpdateTimeString)
+	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_START
+	fileUpdateTimeStartString := os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_START")
+	app.cfg.FileUpdateTimeStartHour, app.cfg.FileUpdateTimeStartMinute, err = parseTimeString(fileUpdateTimeStartString)
 	if err != nil {
-		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME not specified or invalid, using time %s", defaultUpdateTimeString)
-		app.cfg.FileUpdateTimeString = defaultUpdateTimeString
+		app.logger.Debugf("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_START not specified or invalid, using time %02d:%02d", defaultUpdateTimeStartHour, defaultUpdateTimeStartMinute)
+		app.cfg.FileUpdateTimeStartHour = defaultUpdateTimeStartHour
+		app.cfg.FileUpdateTimeStartMinute = defaultUpdateTimeStartMinute
 	}
 
-	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK
-	weekdayStr := os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK")
-	weekday, err := parseWeekday(weekdayStr)
-	if weekdayStr == "" || err != nil {
-		// invalid weekday val (will be used to signal any)
-		app.cfg.FileUpdateDayOfWeek = -1
-		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAY_OF_WEEK not specified or invalid, key/cert file updates will occur on any day")
-	} else {
-		// valid weekday
-		app.cfg.FileUpdateDayOfWeek = weekday
+	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_END
+	fileUpdateTimeEndString := os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_END")
+	app.cfg.FileUpdateTimeEndHour, app.cfg.FileUpdateTimeEndMinute, err = parseTimeString(fileUpdateTimeEndString)
+	if err != nil {
+		app.logger.Debugf("LEGO_CERTHUB_CLIENT_FILE_UPDATE_TIME_END not specified or invalid, using time %02d:%02d", defaultUpdateTimeEndHour, defaultUpdateTimeEndMinute)
+		app.cfg.FileUpdateTimeEndHour = defaultUpdateTimeEndHour
+		app.cfg.FileUpdateTimeEndMinute = defaultUpdateTimeEndMinute
+	}
+
+	// calculate if time window includes midnight
+	app.cfg.FileUpdateTimeIncludesMidnight = false
+	if app.cfg.FileUpdateTimeEndHour < app.cfg.FileUpdateTimeStartHour || (app.cfg.FileUpdateTimeEndHour == app.cfg.FileUpdateTimeStartHour && app.cfg.FileUpdateTimeEndMinute < app.cfg.FileUpdateTimeStartMinute) {
+		app.cfg.FileUpdateTimeIncludesMidnight = true
+	}
+
+	// LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAYS_OF_WEEK
+	weekdaysStr := os.Getenv("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAYS_OF_WEEK")
+	app.cfg.FileUpdateDaysOfWeek, err = parseWeekdaysString(weekdaysStr)
+	if weekdaysStr == "" || err != nil {
+		// invalid weekdays val = all Weekday
+		app.cfg.FileUpdateDaysOfWeek = allWeekdays
+		app.logger.Debug("LEGO_CERTHUB_CLIENT_FILE_UPDATE_DAYS_OF_WEEK not specified or invalid, key/cert file updates will occur on any day")
 	}
 
 	// log file write plan
-	dayOfWeekLogText := "any day of the week"
-	if app.cfg.FileUpdateDayOfWeek >= 0 && app.cfg.FileUpdateDayOfWeek < 7 {
-		dayOfWeekLogText = app.cfg.FileUpdateDayOfWeek.String() + "s"
+	dayOfWeekLogText := ""
+	for k := range app.cfg.FileUpdateDaysOfWeek {
+		if dayOfWeekLogText != "" {
+			dayOfWeekLogText = dayOfWeekLogText + " "
+		}
+		dayOfWeekLogText = dayOfWeekLogText + k.String()
 	}
-	app.logger.Infof("new key/cert files will be written on %s at %s", dayOfWeekLogText, app.cfg.FileUpdateTimeString)
+
+	app.logger.Infof("new key/cert files will be permitted to write on %s between %02d:%02d and %02d:%02d", dayOfWeekLogText, app.cfg.FileUpdateTimeStartHour,
+		app.cfg.FileUpdateTimeStartMinute, app.cfg.FileUpdateTimeEndHour, app.cfg.FileUpdateTimeEndMinute)
 
 	// LEGO_CERTHUB_CLIENT_RESTART_DOCKER_CONTAINER (0... etc.)
 	app.cfg.DockerContainersToRestart = []string{}

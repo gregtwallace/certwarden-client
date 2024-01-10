@@ -32,10 +32,8 @@ func main() {
 		// os.Exit(1)
 	}
 
-	// write files to disc; if file update time was specified, do NOT write files if they already
-	// exist and cert isn't expired
-	onlyIfMissing := app.cfg.FileUpdateTimeString != ""
-	diskNeedsUpdate := app.updateCertFilesAndRestartContainers(onlyIfMissing)
+	// write files to disk (initially only if desired file(s) are missing)
+	diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
 
 	// if app failed to get newest cert from LeGo or the disk needs an update written, schedule an update
 	// job to try again
