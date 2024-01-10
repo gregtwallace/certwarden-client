@@ -170,10 +170,22 @@ func (app *app) updateCertFilesAndRestartContainers(onlyIfMissing bool) (diskNee
 		}
 	}
 
-	app.logger.Info("key/cert file update complete")
+	// log result
+	diskNeedsUpdate = false
+	if failedAnyWrite {
+		// any write failure
+		app.logger.Error("key/cert file(s) write: at least one write failed")
+		diskNeedsUpdate = true
+	} else if wroteAnyFiles {
+		// no write failure, and wrote file(s)
+		app.logger.Info("key/cert file(s) write: successfully wrote complete disk update")
+		diskNeedsUpdate = false
+	} else if keyOrCertFileUpdated && !wroteAnyFiles /* && not needed but just in case above code changes */ {
+		// didn't write any files but update needed
+		app.logger.Info("key/cert file(s) write: not performed, but a write is needed")
+		diskNeedsUpdate = true
+	}
 
-	// if key or cert in memory was different than disk AND files didn't get written, disk is due for an update
-	diskNeedsUpdate = (keyOrCertFileUpdated && !wroteAnyFiles) || failedAnyWrite
 	return diskNeedsUpdate
 }
 
