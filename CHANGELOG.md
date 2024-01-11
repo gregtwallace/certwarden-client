@@ -2,6 +2,11 @@
 
 NOTE: This application is not yet intended for general use.
 
+## [v0.1.6] - 2024-01-10
+
+- Clarify log message about file write.
+
+
 ## [v0.1.5] - 2024-01-10
 
 - Fix incorrect scheduling of file write job when not needed.
