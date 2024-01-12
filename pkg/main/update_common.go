@@ -184,6 +184,9 @@ func (app *app) updateCertFilesAndRestartContainers(onlyIfMissing bool) (diskNee
 		// didn't write any files but update needed
 		app.logger.Info("key/cert file(s) write: not performed, but a write is needed")
 		diskNeedsUpdate = true
+	} else {
+		// everything good to go
+		app.logger.Info("key/cert file(s) write: not performed, all files are up to date")
 	}
 
 	return diskNeedsUpdate
