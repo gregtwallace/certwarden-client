@@ -2,6 +2,10 @@
 
 NOTE: This application is not yet intended for general use.
 
+## [v0.1.7] - 2024-01-11
+
+- Add a log message for no write and up to date.
+
 ## [v0.1.6] - 2024-01-10
 
 - Clarify log message about file write.
