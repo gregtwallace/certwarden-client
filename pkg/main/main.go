@@ -32,17 +32,19 @@ func main() {
 		// os.Exit(1)
 	}
 
-	// write files to disk (initially only if desired file(s) are missing)
-	diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
+	// run / schedule jobs based on if newest cert is confirmed in memory
+	if currentCertInMemory {
+		// initial fetch worked, try to write disk
+		diskNeedsUpdate := app.updateCertFilesAndRestartContainers(true)
 
-	// if app failed to get newest cert from LeGo or the disk needs an update written, schedule an update
-	// job to try again
-	if !currentCertInMemory {
-		// failed to get from LeGo server, schedule fetch and update
+		// schedule write, if needed
+		if diskNeedsUpdate {
+			// fetch was fine but files not written yet, schedule file write
+			app.scheduleJobWriteCertsMemoryToDisk()
+		}
+	} else {
+		// failed to get newest cert, so schedule future fetch and write
 		app.scheduleJobFetchCertsAndWriteToDisk()
-	} else if diskNeedsUpdate {
-		// fetch was fine but files not written yet, schedule file write
-		app.scheduleJobWriteCertsMemoryToDisk()
 	}
 
 	// start https server
