@@ -59,7 +59,9 @@ func main() {
 	<-app.shutdownContext.Done()
 
 	// cancel any pending job
-	app.pendingJobCancel()
+	if app.pendingJobCancel != nil {
+		app.pendingJobCancel()
+	}
 
 	// wait for each component/service to shutdown
 	// but also implement a maxWait chan to force close (panic)
