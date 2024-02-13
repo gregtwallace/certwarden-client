@@ -20,7 +20,7 @@ WORKDIR /
 RUN apk add git && \
     git clone --depth 1 --branch "${VERSION}" https://github.com/gregtwallace/legocerthub-client.git /src && \
     cd /src && \
-    go build -o ./lego-client-linux-amd64 ./pkg/main
+    go build -o ./lego-client ./pkg/main
 
 FROM alpine:${ALPINE_VERSION}
 
@@ -30,7 +30,7 @@ WORKDIR /app
 RUN apk add --no-cache tzdata
 
 # copy app
-COPY --from=build /src/lego-client-linux-amd64 .
+COPY --from=build /src/lego-client .
 COPY ./README.md .
 COPY ./CHANGELOG.md .
 COPY ./LICENSE.md .
@@ -38,4 +38,4 @@ COPY ./LICENSE.md .
 # https server
 EXPOSE 5055/tcp
 
-CMD /app/lego-client-linux-amd64
+CMD /app/lego-client
