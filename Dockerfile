@@ -6,7 +6,7 @@
 # docker run -d --name legocerthub-client -e TZ=Europe/Stockholm -v /var/run/docker.sock:/var/run/docker.sock -p 5055:5055 -e [config vars here] ghcr.io/gregtwallace/legocerthub-client:latest
 
 # Versions - keep in sync with build_releases.yml
-ARG ALPINE_VERSION=3.17
+ARG ALPINE_VERSION=3.19
 ARG GO_VERSION=1.22.0
 # https://hub.docker.com/_/alpine
 # https://hub.docker.com/_/golang
