@@ -1,10 +1,15 @@
 # LeGo CertHub Client Changelog
 
-NOTE: This application is not yet intended for general use.
+## [v0.2.0] - 2024-02-12
+
+First 'real' release. Some bug fixes and dependency updates from the
+last version.
+
 
 ## [v0.1.7] - 2024-01-11
 
 - Add a log message for no write and up to date.
+
 
 ## [v0.1.6] - 2024-01-10
 
