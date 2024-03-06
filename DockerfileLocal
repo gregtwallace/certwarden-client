@@ -4,7 +4,7 @@
 # docker build . -f DockerfileLocal -t legocerthub-client:v0.1.0
 
 # Versions - keep in sync with build_releases.yml
-ARG ALPINE_VERSION=3.17
+ARG ALPINE_VERSION=3.19
 ARG GO_VERSION=1.21.5
 # https://hub.docker.com/_/alpine
 # https://hub.docker.com/_/golang
