@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	postRoute = "/legocerthubclient/api/v1/install"
+	postRoute = "/certwardenclient/api/v1/install"
 )
 
 // innerPayload is the struct for the unencrypted data that is inside the payload sent from
@@ -24,8 +24,22 @@ type postPayload struct {
 }
 
 func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
+	// only allow POST
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	// verify route is correct, else 404
-	if (r.URL.Path != postRoute && r.URL.Path != postRoute+"/") || r.Method != http.MethodPost {
+	if r.URL.Path == postRoute || r.URL.Path == postRoute+"/" {
+		// correct route, no-op
+
+	} else if r.URL.Path == "/legocerthubclient/api/v1/install" || r.URL.Path == "/legocerthubclient/api/v1/install/" {
+		// pre-rename route, log warning but proceed
+		app.logger.Warnf("server sent payload to pre-rename route; update server")
+
+	} else {
+		// bad route
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
