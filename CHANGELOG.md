@@ -1,6 +1,25 @@
 # Cert Warden Client Changelog
 (Formerly LeGo CertHub Client)
 
+## [v0.3.0] - 2024-04-15
+
+Name changed to Cert Warden.
+
+> [!CAUTION]
+> The environment variable names were changed. Since the client is still
+> in a relatively alpha stage, I did not implement any backward compat
+> and you will need to update your environment variable names.
+
+The client route that the client listens for was changed, but backward 
+compat actions were taken on this front (the new server version will send 
+to both routes and the new client will listen for both). This will be
+dropped eventually but for now keeps the breaking change contained to the
+environment variable names.
+
+In addition to the name change and compatibility issue, this release
+updates some dependencies.
+
+
 ## [v0.2.1] - 2024-03-06
 
 Update to Go 1.22.1, which includes some security fixes.
