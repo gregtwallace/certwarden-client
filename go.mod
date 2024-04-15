@@ -1,4 +1,4 @@
-module legocerthub-client
+module certwarden-client
 
 go 1.22.1
 

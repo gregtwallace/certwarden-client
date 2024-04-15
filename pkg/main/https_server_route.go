@@ -11,13 +11,13 @@ const (
 )
 
 // innerPayload is the struct for the unencrypted data that is inside the payload sent from
-// LeGo to the client
+// server to the client
 type innerPayload struct {
 	KeyPem  string `json:"key_pem"`
 	CertPem string `json:"cert_pem"`
 }
 
-// postPayload is the actual payload sent from LeGo to the client
+// postPayload is the actual payload sent from server to the client
 type postPayload struct {
 	// Payload is the base64 encoded string of the cipherData produced from encrypting innerPayload
 	Payload string `json:"payload"`
@@ -88,7 +88,7 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	// process and install new key/cert in client (will error if bad)
 	err = app.updateClientCert([]byte(innerPayload.KeyPem), []byte(innerPayload.CertPem))
 	if err != nil {
-		app.logger.Errorf("failed to process key and/or cert file(s) from lego post (%s)", err)
+		app.logger.Errorf("failed to process key and/or cert file(s) from server post (%s)", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}

@@ -19,7 +19,7 @@ type httpClient struct {
 // newHttpClient creates a new httpClient
 func newHttpClient() (client *httpClient) {
 	// userAgent
-	userAgent := fmt.Sprintf("LeGoCertHubClient/%s (%s; %s)", appVersion, runtime.GOOS, runtime.GOARCH)
+	userAgent := fmt.Sprintf("CertWardenClient/%s (%s; %s)", appVersion, runtime.GOOS, runtime.GOARCH)
 
 	// create *Client
 	client = &httpClient{
@@ -34,7 +34,7 @@ func newHttpClient() (client *httpClient) {
 	return client
 }
 
-// getPemWithApiKey fetches a pem response from the LeGo server
+// getPemWithApiKey fetches a pem response from the server
 func (c *httpClient) getPemWithApiKey(url, apiKey string) (pemContent []byte, err error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {

@@ -1,7 +1,7 @@
 # For dev / testing - build using local code
 
 # example build:
-# docker build . -f DockerfileLocal -t legocerthub-client:v0.1.0
+# docker build . -f DockerfileLocal -t certwarden-client:v0.1.0
 
 # Versions - keep in sync with build_releases.yml
 ARG ALPINE_VERSION=3.19
@@ -16,7 +16,7 @@ WORKDIR /
 COPY ./ ./src
 
 RUN cd /src && \
-    go build -o ./lego-client-linux-amd64 ./pkg/main
+    go build -o ./certwarden-client-linux-amd64 ./pkg/main
 
 FROM alpine:${ALPINE_VERSION}
 
@@ -26,7 +26,7 @@ WORKDIR /app
 RUN apk add --no-cache tzdata
 
 # copy app
-COPY --from=build /src/lego-client-linux-amd64 .
+COPY --from=build /src/certwarden-client-linux-amd64 .
 COPY ./README.md .
 COPY ./CHANGELOG.md .
 COPY ./LICENSE.md .
@@ -34,4 +34,4 @@ COPY ./LICENSE.md .
 # https server
 EXPOSE 5055/tcp
 
-CMD /app/lego-client-linux-amd64
+CMD /app/certwarden-client-linux-amd64

@@ -1,4 +1,5 @@
-# LeGo CertHub Client Changelog
+# Cert Warden Client Changelog
+(Formerly LeGo CertHub Client)
 
 ## [v0.2.1] - 2024-03-06
 

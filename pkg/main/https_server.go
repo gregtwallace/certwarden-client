@@ -15,7 +15,7 @@ const httpServerReadTimeout = 5 * time.Second
 const httpServerWriteTimeout = 10 * time.Second
 const httpServerIdleTimeout = 1 * time.Minute
 
-// startHttpsServer starts the lego-certhub-client https server
+// startHttpsServer starts the client https server
 func (app *app) startHttpsServer() error {
 	// http server config
 	srv := &http.Server{
@@ -30,12 +30,12 @@ func (app *app) startHttpsServer() error {
 	}
 
 	// launch https
-	app.logger.Infof("starting lego-certhub-client https server bound to %s", srv.Addr)
+	app.logger.Infof("starting https server bound to %s", srv.Addr)
 
 	// create listener for web server
 	ln, err := net.Listen("tcp", srv.Addr)
 	if err != nil {
-		return fmt.Errorf("lego-certhub-client https server cannot bind to %s (%s), exiting", srv.Addr, err)
+		return fmt.Errorf("https server cannot bind to %s (%s), exiting", srv.Addr, err)
 	}
 
 	// start server
@@ -45,7 +45,7 @@ func (app *app) startHttpsServer() error {
 
 		err := srv.ServeTLS(ln, "", "")
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			app.logger.Errorf("lego-certhub-client https server returned error (%s)", err)
+			app.logger.Errorf("https server returned error (%s)", err)
 		}
 
 		app.logger.Info("https server shutdown complete")
@@ -61,7 +61,7 @@ func (app *app) startHttpsServer() error {
 
 		err = srv.Shutdown(ctx)
 		if err != nil {
-			app.logger.Errorf("error shutting down lego-certhub-client server")
+			app.logger.Errorf("error shutting down https server")
 		}
 	}()
 

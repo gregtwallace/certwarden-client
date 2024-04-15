@@ -85,7 +85,7 @@ func (app *app) nextFileUpdateWindowStart() time.Time {
 	return nextWindow.Add(time.Duration(addDays) * 24 * time.Hour)
 }
 
-// scheduleJobWriteCertsMemoryToDisk schedules a job to write the lego client's
+// scheduleJobWriteCertsMemoryToDisk schedules a job to write the client's
 // key/cert pem from memory to disk (and generate any additional files on disk that
 // are configured)
 func (app *app) scheduleJobWriteCertsMemoryToDisk() {
@@ -145,9 +145,9 @@ func (app *app) scheduleJobWriteCertsMemoryToDisk() {
 	}()
 }
 
-// scheduleJobFetchCertsAndWriteToDisk fetches the latest key/cert from LeGo server
+// scheduleJobFetchCertsAndWriteToDisk fetches the latest key/cert from server
 // and updates the client's key/cert. It repeats this task every 15 minutes until
-// it succeeds. Then it schedules a job to write lego client's key/cert pem from
+// it succeeds. Then it schedules a job to write client's key/cert pem from
 // memory to disk (along with any other files that are configured).
 func (app *app) scheduleJobFetchCertsAndWriteToDisk() {
 	go func() {
@@ -183,10 +183,10 @@ func (app *app) scheduleJobFetchCertsAndWriteToDisk() {
 
 		app.logger.Infof("fetch certs job scheduled for %s executing", runTimeString)
 
-		// try and get newer key/cert from lego server
+		// try and get newer key/cert from server
 		err := app.updateClientKeyAndCertchain()
 		if err != nil {
-			app.logger.Errorf("failed to fetch key/cert from lego server (%s)", err)
+			app.logger.Errorf("failed to fetch key/cert from server (%s)", err)
 			// schedule try again
 			app.scheduleJobFetchCertsAndWriteToDisk()
 		} else {

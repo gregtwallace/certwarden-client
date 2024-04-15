@@ -1,9 +1,9 @@
 # example build:
-# docker build . --build-arg=VERSION=v0.1.0 -t legocerthub-client:v0.1.0
+# docker build . --build-arg=VERSION=v0.1.0 -t certwarden-client:v0.1.0
 
 # example run
 # NOTE: If you don't want or need auto container restart, you can skip mounting docker.sock
-# docker run -d --name legocerthub-client -e TZ=Europe/Stockholm -v /var/run/docker.sock:/var/run/docker.sock -p 5055:5055 -e [config vars here] ghcr.io/gregtwallace/legocerthub-client:latest
+# docker run -d --name certwarden-client -e TZ=Europe/Stockholm -v /var/run/docker.sock:/var/run/docker.sock -p 5055:5055 -e [config vars here] ghcr.io/gregtwallace/certwarden-client:latest
 
 # Versions - keep in sync with build_releases.yml
 ARG ALPINE_VERSION=3.19
@@ -18,9 +18,9 @@ ARG VERSION
 WORKDIR /
 
 RUN apk add git && \
-    git clone --depth 1 --branch "${VERSION}" https://github.com/gregtwallace/legocerthub-client.git /src && \
+    git clone --depth 1 --branch "${VERSION}" https://github.com/gregtwallace/certwarden-client.git /src && \
     cd /src && \
-    go build -o ./lego-client ./pkg/main
+    go build -o ./certwarden-client ./pkg/main
 
 FROM alpine:${ALPINE_VERSION}
 
@@ -30,7 +30,7 @@ WORKDIR /app
 RUN apk add --no-cache tzdata
 
 # copy app
-COPY --from=build /src/lego-client .
+COPY --from=build /src/certwarden-client .
 COPY ./README.md .
 COPY ./CHANGELOG.md .
 COPY ./LICENSE.md .
@@ -38,4 +38,4 @@ COPY ./LICENSE.md .
 # https server
 EXPOSE 5055/tcp
 
-CMD /app/lego-client
+CMD /app/certwarden-client

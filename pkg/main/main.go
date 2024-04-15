@@ -17,11 +17,11 @@ func main() {
 		// os.Exit(1)
 	}
 
-	// try and get newer key/cert from lego server on start
+	// try and get newer key/cert from server on start
 	currentCertInMemory := false
 	err = app.updateClientKeyAndCertchain()
 	if err != nil {
-		app.logger.Errorf("failed to fetch key/cert from lego server (%s)", err)
+		app.logger.Errorf("failed to fetch key/cert from server (%s)", err)
 	} else {
 		currentCertInMemory = true
 	}
@@ -82,5 +82,5 @@ func main() {
 		app.logger.Panic("graceful shutdown of component(s) failed due to time out, forcing shutdown")
 	}
 
-	app.logger.Info("lego-certhub-client exited")
+	app.logger.Info("cert-warden-client exited")
 }

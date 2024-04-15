@@ -195,12 +195,12 @@ func (app *app) updateCertFilesAndRestartContainers(onlyIfMissing bool) (diskNee
 // updateClientCert validates the specified key and cert pem are valid and updates the client's cert
 // key pair (if not already up to date)
 func (app *app) updateClientCert(keyPem, certPem []byte) error {
-	app.logger.Info("running key/cert update of lego client's cert")
+	app.logger.Info("running key/cert update of client's cert")
 
 	// update app's key/cert (validates the pair as well, tls won't work if bad)
 	updated, err := app.tlsCert.Update(keyPem, certPem)
 	if err != nil {
-		return fmt.Errorf("failed to update key and/or cert in lego client tls cert (%s)", err)
+		return fmt.Errorf("failed to update key and/or cert in client tls cert (%s)", err)
 	}
 
 	// log
