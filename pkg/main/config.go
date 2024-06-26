@@ -75,7 +75,7 @@ const (
 	defaultBindPort    = 5055
 
 	defaultCertStoragePath = "/opt/certwarden/certs"
-	defaultKeyPermissions  = fs.FileMode(0640)
+	defaultKeyPermissions  = fs.FileMode(0600)
 	defaultCertPermissions = fs.FileMode(0644)
 
 	defaultPFXCreate   = false
