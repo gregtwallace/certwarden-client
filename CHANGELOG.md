@@ -1,6 +1,12 @@
 # Cert Warden Client Changelog
 (Formerly LeGo CertHub Client)
 
+## [v0.3.1] - 2024-06-26
+
+Fix incorrect parsing of cert and key file permission environment
+variables. Also set default key permissions to `0600`.
+
+
 ## [v0.3.0] - 2024-04-15
 
 Name changed to Cert Warden.

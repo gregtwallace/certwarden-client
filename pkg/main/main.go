@@ -5,7 +5,7 @@ import (
 )
 
 // version
-const appVersion = "0.3.0"
+const appVersion = "0.3.1"
 
 // main entrypoint
 func main() {
