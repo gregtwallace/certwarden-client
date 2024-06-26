@@ -320,7 +320,8 @@ func configureApp() (*app, error) {
 
 	// CW_CLIENT_KEY_PERM
 	keyPerm := os.Getenv("CW_CLIENT_KEY_PERM")
-	keyPermInt, err := strconv.Atoi(keyPerm)
+	keyPermInt, err := strconv.ParseInt(keyPerm, 0, 0)
+	app.logger.Debugf("CW_CLIENT_KEY_PERM \"%o\"", keyPermInt)
 	if keyPerm == "" || err != nil {
 		app.logger.Debugf("CW_CLIENT_KEY_PERM not specified or invalid, using default \"%o\"", defaultKeyPermissions)
 		app.cfg.KeyPermissions = defaultKeyPermissions
@@ -330,7 +331,8 @@ func configureApp() (*app, error) {
 
 	// CW_CLIENT_CERT_PERM
 	certPerm := os.Getenv("CW_CLIENT_CERT_PERM")
-	certPermInt, err := strconv.Atoi(certPerm)
+	certPermInt, err := strconv.ParseInt(certPerm, 0, 0)
+	app.logger.Debugf("CW_CLIENT_CERT_PERM \"%o\"", certPermInt)
 	if certPerm == "" || err != nil {
 		app.logger.Debugf("CW_CLIENT_CERT_PERM not specified, using default \"%o\"", defaultCertPermissions)
 		app.cfg.CertPermissions = defaultCertPermissions
