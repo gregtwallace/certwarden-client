@@ -14,6 +14,3 @@ further updates directly from the Cert Warden Server.
 
 Cert Warden Client is also able to restart docker containers to make 
 them pick up new certificate files, when they're written.
-
-NOTE: This application is not yet intended for general use. Use it at 
-your own risk (if you like living on the edge)!
