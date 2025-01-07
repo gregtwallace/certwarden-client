@@ -1,6 +1,4 @@
 # Cert Warden Client Changelog
-(Formerly LeGo CertHub Client)
-
 ## [v0.3.1] - 2024-06-26
 
 Fix incorrect parsing of cert and key file permission environment

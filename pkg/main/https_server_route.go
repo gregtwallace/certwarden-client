@@ -34,10 +34,6 @@ func (app *app) postKeyAndCert(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == postRoute || r.URL.Path == postRoute+"/" {
 		// correct route, no-op
 
-	} else if r.URL.Path == "/legocerthubclient/api/v1/install" || r.URL.Path == "/legocerthubclient/api/v1/install/" {
-		// pre-rename route, log warning but proceed
-		app.logger.Warnf("server sent payload to pre-rename route; update server")
-
 	} else {
 		// bad route
 		w.WriteHeader(http.StatusNotFound)

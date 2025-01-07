@@ -1,6 +1,4 @@
 # Cert Warden Client
-(Formerly LeGo CertHub Client)
-
 Centralized Certificate Management
 Conveniently Leverage Let&apos;s Encrypt to Secure Your Infrastructure
 
