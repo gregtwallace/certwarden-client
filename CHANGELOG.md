@@ -1,4 +1,15 @@
 # Cert Warden Client Changelog
+
+## [v0.4.0] - 2025-01-22
+
+Update Go & Alpine to the latest version, updated the Docker client pkg, 
+and allow specifying environment vars related to the Docker client 
+connection (e.g., `DOCKER_HOST`).
+
+Also, remove backwards compatibility with LeGo CertHub and changes from
+using a custom http Client to a custom http Transport.
+
+
 ## [v0.3.1] - 2024-06-26
 
 Fix incorrect parsing of cert and key file permission environment
