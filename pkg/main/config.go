@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -101,7 +102,7 @@ type app struct {
 
 	pendingJobCancel context.CancelFunc
 
-	httpClient      *httpClient
+	httpClient      *http.Client
 	dockerAPIClient *dockerClient.Client
 	tlsCert         *SafeCert
 	cipherAEAD      cipher.AEAD
@@ -155,7 +156,7 @@ func configureApp() (*app, error) {
 	app := &app{
 		logger:     logger,
 		cfg:        &config{},
-		httpClient: newHttpClient(),
+		httpClient: makeHttpClient(),
 		tlsCert:    NewSafeCert(),
 	}
 
