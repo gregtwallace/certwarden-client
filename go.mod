@@ -1,6 +1,6 @@
 module certwarden-client
 
-go 1.22.2
+go 1.23.5
 
 require (
 	github.com/docker/docker v27.5.0+incompatible
