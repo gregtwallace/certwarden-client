@@ -269,7 +269,10 @@ func configureApp() (*app, error) {
 		app.cfg.DockerContainersToRestart = append(app.cfg.DockerContainersToRestart, containerName)
 	}
 	if len(app.cfg.DockerContainersToRestart) > 0 {
-		app.dockerAPIClient, err = dockerClient.NewClientWithOpts(dockerClient.WithAPIVersionNegotiation())
+		app.dockerAPIClient, err = dockerClient.NewClientWithOpts(
+			dockerClient.FromEnv,
+			dockerClient.WithAPIVersionNegotiation(),
+		)
 		if err != nil {
 			return app, fmt.Errorf("specified CW_CLIENT_RESTART_DOCKER_CONTAINER but couldn't make docker api client (%s)", err)
 		}
