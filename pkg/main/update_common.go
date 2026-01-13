@@ -95,27 +95,43 @@ func (app *app) updateCertFilesAndRestartContainers(certIndex int, onlyIfMissing
 	// write key pem (always if not exist, if exists but updated: only write if NOT only missing files OR any file is missing)
 	// AKA write file anyway even if !onlyIfMissing if something else is missing, because something will be written and trigger restart anyway
 	if !keyFileExists || (keyFileUpdated && (!onlyIfMissing || anyFileMissing)) {
-		err := os.WriteFile(app.cfg.Certs[certIndex].CertStoragePath+"/"+app.cfg.Certs[certIndex].KeyPemFilename, keyPemApp, app.cfg.Certs[certIndex].KeyPermissions)
+		keyFilePath := app.cfg.Certs[certIndex].CertStoragePath + "/" + app.cfg.Certs[certIndex].KeyPemFilename
+		err := os.WriteFile(keyFilePath, keyPemApp, app.cfg.Certs[certIndex].KeyPermissions)
 		if err != nil {
 			app.logger.Errorf("failed to write key %s file (%s)", app.cfg.Certs[certIndex].KeyPemFilename, err)
 			failedAnyWrite = true
 			// failed, but keep trying
 		} else {
-			wroteAnyFiles = true
-			app.logger.Infof("wrote new key %s file", app.cfg.Certs[certIndex].KeyPemFilename)
+			// Explicitly set permissions after write to ensure they are applied correctly
+			err = os.Chmod(keyFilePath, app.cfg.Certs[certIndex].KeyPermissions)
+			if err != nil {
+				app.logger.Errorf("failed to set permissions on key %s file (%s)", app.cfg.Certs[certIndex].KeyPemFilename, err)
+				failedAnyWrite = true
+			} else {
+				wroteAnyFiles = true
+				app.logger.Infof("wrote new key %s file with permissions %o", app.cfg.Certs[certIndex].KeyPemFilename, app.cfg.Certs[certIndex].KeyPermissions)
+			}
 		}
 	}
 
 	// write cert pem
 	if !certFileExists || (certFileUpdated && (!onlyIfMissing || anyFileMissing)) {
-		err := os.WriteFile(app.cfg.Certs[certIndex].CertStoragePath+"/"+app.cfg.Certs[certIndex].CertPemFilename, certPemApp, app.cfg.Certs[certIndex].CertPermissions)
+		certFilePath := app.cfg.Certs[certIndex].CertStoragePath + "/" + app.cfg.Certs[certIndex].CertPemFilename
+		err := os.WriteFile(certFilePath, certPemApp, app.cfg.Certs[certIndex].CertPermissions)
 		if err != nil {
 			app.logger.Errorf("failed to write cert %s file (%s)", app.cfg.Certs[certIndex].CertPemFilename, err)
 			failedAnyWrite = true
 			// failed, but keep trying
 		} else {
-			wroteAnyFiles = true
-			app.logger.Infof("wrote new cert %s file", app.cfg.Certs[certIndex].CertPemFilename)
+			// Explicitly set permissions after write to ensure they are applied correctly
+			err = os.Chmod(certFilePath, app.cfg.Certs[certIndex].CertPermissions)
+			if err != nil {
+				app.logger.Errorf("failed to set permissions on cert %s file (%s)", app.cfg.Certs[certIndex].CertPemFilename, err)
+				failedAnyWrite = true
+			} else {
+				wroteAnyFiles = true
+				app.logger.Infof("wrote new cert %s file with permissions %o", app.cfg.Certs[certIndex].CertPemFilename, app.cfg.Certs[certIndex].CertPermissions)
+			}
 		}
 	}
 
@@ -130,14 +146,22 @@ func (app *app) updateCertFilesAndRestartContainers(certIndex int, onlyIfMissing
 			// failed, but keep trying
 			failedAnyWrite = true
 		} else {
-			err = os.WriteFile(app.cfg.Certs[certIndex].CertStoragePath+"/"+app.cfg.Certs[certIndex].PfxFilename, pfx, app.cfg.Certs[certIndex].KeyPermissions)
+			pfxFilePath := app.cfg.Certs[certIndex].CertStoragePath + "/" + app.cfg.Certs[certIndex].PfxFilename
+			err = os.WriteFile(pfxFilePath, pfx, app.cfg.Certs[certIndex].KeyPermissions)
 			if err != nil {
 				app.logger.Errorf("failed to write %s (%s)", app.cfg.Certs[certIndex].PfxFilename, err)
 				// failed, but keep trying
 				failedAnyWrite = true
 			} else {
-				app.logger.Infof("wrote new modern pfx %s file", app.cfg.Certs[certIndex].PfxFilename)
-				wroteAnyFiles = true
+				// Explicitly set permissions after write to ensure they are applied correctly
+				err = os.Chmod(pfxFilePath, app.cfg.Certs[certIndex].KeyPermissions)
+				if err != nil {
+					app.logger.Errorf("failed to set permissions on %s (%s)", app.cfg.Certs[certIndex].PfxFilename, err)
+					failedAnyWrite = true
+				} else {
+					app.logger.Infof("wrote new modern pfx %s file with permissions %o", app.cfg.Certs[certIndex].PfxFilename, app.cfg.Certs[certIndex].KeyPermissions)
+					wroteAnyFiles = true
+				}
 			}
 		}
 	}
@@ -150,14 +174,22 @@ func (app *app) updateCertFilesAndRestartContainers(certIndex int, onlyIfMissing
 			// failed, but keep trying
 			failedAnyWrite = true
 		} else {
-			err = os.WriteFile(app.cfg.Certs[certIndex].CertStoragePath+"/"+app.cfg.Certs[certIndex].PfxLegacyFilename, pfx, app.cfg.Certs[certIndex].KeyPermissions)
+			pfxLegacyFilePath := app.cfg.Certs[certIndex].CertStoragePath + "/" + app.cfg.Certs[certIndex].PfxLegacyFilename
+			err = os.WriteFile(pfxLegacyFilePath, pfx, app.cfg.Certs[certIndex].KeyPermissions)
 			if err != nil {
 				app.logger.Errorf("failed to write legacy pfx %s (%s)", app.cfg.Certs[certIndex].PfxLegacyFilename, err)
 				// failed, but keep trying
 				failedAnyWrite = true
 			} else {
-				app.logger.Infof("wrote new legacy pfx %s file", app.cfg.Certs[certIndex].PfxLegacyFilename)
-				wroteAnyFiles = true
+				// Explicitly set permissions after write to ensure they are applied correctly
+				err = os.Chmod(pfxLegacyFilePath, app.cfg.Certs[certIndex].KeyPermissions)
+				if err != nil {
+					app.logger.Errorf("failed to set permissions on legacy pfx %s (%s)", app.cfg.Certs[certIndex].PfxLegacyFilename, err)
+					failedAnyWrite = true
+				} else {
+					app.logger.Infof("wrote new legacy pfx %s file with permissions %o", app.cfg.Certs[certIndex].PfxLegacyFilename, app.cfg.Certs[certIndex].KeyPermissions)
+					wroteAnyFiles = true
+				}
 			}
 		}
 	}
