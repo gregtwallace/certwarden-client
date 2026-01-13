@@ -47,6 +47,11 @@ func main() {
 			// failed to get newest cert, so schedule future fetch and write
 			app.scheduleJobFetchCertsAndWriteToDisk(certIndex)
 		}
+
+		// if polling is enabled, start polling job
+		if app.cfg.PollingInterval > 0 {
+			app.scheduleJobPollingFetch(certIndex)
+		}
 	}
 
 	// start https server

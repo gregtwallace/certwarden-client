@@ -44,6 +44,8 @@ import (
 //			CW_CLIENT_LOGLEVEL									- zap log level for the app
 //			CW_CLIENT_BIND_ADDRESS							- address to bind the https server to
 //			CW_CLIENT_BIND_PORT									- https server port
+//			CW_CLIENT_POLLING_INTERVAL					- interval for polling server for new certificates (e.g., 1d, 5h, 30m)
+//																								if not specified, polling is disabled (uses server push notifications)
 
 //		Certificate Specific:
 //			CW_CLIENT_0_FILE_UPDATE_TIME_START		- 24-hour time when window opens to write key/cert updates to filesystem
@@ -148,10 +150,11 @@ type certConfig struct {
 
 // config holds all of the client configuration
 type config struct {
-	BindAddress   string
-	BindPort      int
-	ServerAddress string
-	Certs         []certConfig
+	BindAddress     string
+	BindPort        int
+	ServerAddress   string
+	PollingInterval time.Duration // 0 means polling is disabled
+	Certs           []certConfig
 }
 
 // configureApp creates the application from environment variables and/or defaults;
@@ -203,6 +206,22 @@ func configureApp() (*app, error) {
 	if bindPort == "" || err != nil || app.cfg.BindPort < 1 || app.cfg.BindPort > 65535 {
 		app.logger.Debugf("CW_CLIENT_BIND_PORT not specified or invalid, using default \"%d\"", defaultBindPort)
 		app.cfg.BindPort = defaultBindPort
+	}
+
+	// CW_CLIENT_POLLING_INTERVAL
+	pollingIntervalStr := os.Getenv("CW_CLIENT_POLLING_INTERVAL")
+	if pollingIntervalStr != "" {
+		app.cfg.PollingInterval, err = parseDurationString(pollingIntervalStr)
+		if err != nil {
+			return app, fmt.Errorf("CW_CLIENT_POLLING_INTERVAL is invalid (%s)", err)
+		}
+		if app.cfg.PollingInterval < time.Minute {
+			return app, errors.New("CW_CLIENT_POLLING_INTERVAL must be at least 1 minute")
+		}
+		app.logger.Infof("polling interval set to %v", app.cfg.PollingInterval)
+	} else {
+		app.cfg.PollingInterval = 0
+		app.logger.Debug("CW_CLIENT_POLLING_INTERVAL not specified, polling disabled (using server push notifications)")
 	}
 
 	// Configure each cert

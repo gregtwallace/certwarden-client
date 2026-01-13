@@ -197,3 +197,52 @@ func (app *app) scheduleJobFetchCertsAndWriteToDisk(certIndex int) {
 		app.logger.Infof("fetch cert %d job scheduled for %s complete", certIndex, runTimeString)
 	}()
 }
+
+// scheduleJobPollingFetch creates a background job that polls the server at regular
+// intervals to check for new certificates. This is an alternative to server push
+// notifications when the client cannot accept incoming connections.
+func (app *app) scheduleJobPollingFetch(certIndex int) {
+	go func() {
+		// cancel any old job
+		if app.pendingJobCancels[certIndex] != nil {
+			app.pendingJobCancels[certIndex]()
+		}
+
+		// make new cancel context for this job
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		app.pendingJobCancels[certIndex] = cancel
+
+		app.logger.Infof("starting polling for cert %d with interval %v", certIndex, app.cfg.PollingInterval)
+
+		ticker := time.NewTicker(app.cfg.PollingInterval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				app.logger.Infof("polling job for cert %d canceled", certIndex)
+				return
+
+			case <-ticker.C:
+				app.logger.Debugf("polling server for cert %d updates", certIndex)
+
+				// try to fetch newer key/cert from server
+				err := app.updateClientKeyAndCertchain(certIndex)
+				if err != nil {
+					app.logger.Errorf("failed to poll and fetch key/cert %d from server (%s)", certIndex, err)
+					// continue polling despite error
+				} else {
+					// success - check if disk needs update
+					diskNeedsUpdate := app.updateCertFilesAndRestartContainers(certIndex, false)
+
+					// if disk needs update but we're outside the update window,
+					// schedule a write job for the next window
+					if diskNeedsUpdate {
+						app.scheduleJobWriteCertsMemoryToDisk(certIndex)
+					}
+				}
+			}
+		}
+	}()
+}

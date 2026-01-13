@@ -100,3 +100,29 @@ func timeAIsAfterOrEqualB(aHr, aMin, bHr, bMin int) bool {
 
 	return false
 }
+
+// parseDurationString parses a duration string like "1d", "5h", "30m" and returns
+// a time.Duration. Supported units: d (days), h (hours), m (minutes), s (seconds)
+func parseDurationString(durationStr string) (time.Duration, error) {
+	if durationStr == "" {
+		return 0, errors.New("duration string is empty")
+	}
+
+	// check for standard Go duration format first (supports combinations like "1h30m")
+	duration, err := time.ParseDuration(durationStr)
+	if err == nil {
+		return duration, nil
+	}
+
+	// if standard parsing fails, try custom day format
+	if strings.HasSuffix(durationStr, "d") {
+		daysStr := strings.TrimSuffix(durationStr, "d")
+		days, err := strconv.Atoi(daysStr)
+		if err != nil || days <= 0 {
+			return 0, errors.New("invalid duration format (use formats like: 1d, 5h, 30m, 1h30m)")
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+
+	return 0, errors.New("invalid duration format (use formats like: 1d, 5h, 30m, 1h30m)")
+}
