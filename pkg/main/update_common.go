@@ -172,6 +172,16 @@ func (app *app) updateCertFilesAndRestartContainers(certIndex int, onlyIfMissing
 		}
 	}
 
+	// execute commands in docker containers (if any files written)
+	if len(app.cfg.Certs[certIndex].DockerContainerCommands) > 0 {
+		if wroteAnyFiles {
+			app.logger.Infof("at least one file changed for cert %d, executing docker container commands", certIndex)
+			app.executeDockerContainerCommands(certIndex)
+		} else {
+			app.logger.Debugf("not executing docker container commands for cert %d, no changes were written to disk", certIndex)
+		}
+	}
+
 	// log result
 	diskNeedsUpdate = false
 	if failedAnyWrite {

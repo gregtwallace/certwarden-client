@@ -56,6 +56,9 @@ import (
 //			CW_CLIENT_0_RESTART_DOCKER_CONTAINER2 ... etc.
 //				Note: Restart is based on file update, so use the vars above to set a file update time window and day(s) of week
 //			CW_CLIENT_0_RESTART_DOCKER_STOP_ONLY	- if 'true' docker containers will be stopped instead of restarted (this is useful if another process like systemctl will start them back up)
+//    	CW_CLIENT_0_COMMAND_DOCKER_CONTAINER0 - execute command in container after cert update, format: "container_name:command arg1 arg2" (e.g., "nginx:nginx -s reload")
+//    	CW_CLIENT_0_COMMAND_DOCKER_CONTAINER1 - another container command (keep adding 1 to the number for more)
+//			CW_CLIENT_0_COMMAND_DOCKER_CONTAINER2 ... etc.
 
 // 			CW_CLIENT_0_CERT_PATH								- the path to save all keys and certificates to
 // 			CW_CLIENT_0_KEY_PEM_FILENAME				- filename to save the key pem as (default is key0.pem ; number == index)
@@ -118,6 +121,12 @@ type app struct {
 	cipherAEAD        []cipher.AEAD
 }
 
+// containerCommand holds a container name and command to execute
+type containerCommand struct {
+	ContainerName string
+	Command       []string
+}
+
 // certConfig contains all of the configuration specific to
 // a given certificate
 type certConfig struct {
@@ -128,6 +137,7 @@ type certConfig struct {
 	FileUpdateTimeIncludesMidnight bool
 	FileUpdateDaysOfWeek           map[time.Weekday]struct{}
 	DockerContainersToRestart      []string
+	DockerContainerCommands        []containerCommand
 	DockerStopOnly                 bool
 	KeyName                        string
 	KeyApiKey                      string
@@ -326,21 +336,55 @@ func configureApp() (*app, error) {
 			cert.DockerContainersToRestart = append(cert.DockerContainersToRestart, containerName)
 		}
 
+		// CW_CLIENT_COMMAND_DOCKER_CONTAINER (0... etc.)
+		// Format: "container_name:command arg1 arg2"
+		cert.DockerContainerCommands = []containerCommand{}
+		for i := 0; true; i++ {
+			commandStr := os.Getenv(prefix + "COMMAND_DOCKER_CONTAINER" + strconv.Itoa(i))
+			if commandStr == "" {
+				// if next number not specified, done
+				break
+			}
+
+			// Parse format: "container_name:command arg1 arg2"
+			parts := strings.SplitN(commandStr, ":", 2)
+			if len(parts) != 2 {
+				app.logger.Errorf("%sCOMMAND_DOCKER_CONTAINER%d has invalid format (expected 'container:command'), skipping", prefix, i)
+				continue
+			}
+
+			containerName := strings.TrimSpace(parts[0])
+			commandPart := strings.TrimSpace(parts[1])
+
+			if containerName == "" || commandPart == "" {
+				app.logger.Errorf("%sCOMMAND_DOCKER_CONTAINER%d has empty container name or command, skipping", prefix, i)
+				continue
+			}
+
+			// Split command into parts (space-separated)
+			commandArgs := strings.Fields(commandPart)
+
+			cert.DockerContainerCommands = append(cert.DockerContainerCommands, containerCommand{
+				ContainerName: containerName,
+				Command:       commandArgs,
+			})
+		}
+
 		// ensure this only happens once -- app has one common api client
-		if len(cert.DockerContainersToRestart) > 0 && app.dockerAPIClient == nil {
+		if (len(cert.DockerContainersToRestart) > 0 || len(cert.DockerContainerCommands) > 0) && app.dockerAPIClient == nil {
 			app.dockerAPIClient, err = dockerClient.NewClientWithOpts(
 				dockerClient.FromEnv,
 				dockerClient.WithAPIVersionNegotiation(),
 			)
 			if err != nil {
-				return app, fmt.Errorf("specified %sRESTART_DOCKER_CONTAINER but couldn't make docker api client (%s)", prefix, err)
+				return app, fmt.Errorf("specified %sRESTART_DOCKER_CONTAINER or %sCOMMAND_DOCKER_CONTAINER but couldn't make docker api client (%s)", prefix, prefix, err)
 			}
 
 			testPingCtx, cancelPing := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancelPing()
 			_, err := app.dockerAPIClient.Ping(testPingCtx)
 			if err != nil {
-				app.logger.Errorf("specified %sRESTART_DOCKER_CONTAINER but couldn't connect to docker api (%s), verify access to docker or restarts will not occur", prefix, err)
+				app.logger.Errorf("specified %sRESTART_DOCKER_CONTAINER or %sCOMMAND_DOCKER_CONTAINER but couldn't connect to docker api (%s), verify access to docker or operations will not occur", prefix, prefix, err)
 			}
 		}
 
